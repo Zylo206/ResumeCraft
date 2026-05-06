@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS `ai_optimize_record` (
+    `id`                BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `user_id`           BIGINT       NOT NULL COMMENT '用户 ID',
+    `resume_id`         BIGINT       NOT NULL COMMENT '简历 ID',
+    `module_id`         BIGINT       NOT NULL COMMENT '模块 ID',
+    `module_type`       VARCHAR(32)  NOT NULL COMMENT '模块类型',
+    `field_type`        VARCHAR(32)  NOT NULL COMMENT '字段类型',
+    `field_index`       INT          NULL COMMENT '字段索引，非列表字段为空',
+    `record_status`     VARCHAR(16)  NOT NULL COMMENT '状态: completed/error',
+    `original_text`     TEXT         NULL COMMENT '优化前文本',
+    `reasoning_markdown` LONGTEXT    NULL COMMENT 'AI 生成过程 Markdown',
+    `streamed_content`  LONGTEXT     NULL COMMENT '流式结果内容',
+    `optimized_text`    TEXT         NULL COMMENT '最终优化结果',
+    `candidates`        JSON         NULL COMMENT '候选结果 JSON 数组',
+    `prompt`            TEXT         NULL COMMENT '本次请求提示词',
+    `system_prompt`     TEXT         NULL COMMENT '系统提示词',
+    `error_message`     VARCHAR(512) NULL COMMENT '失败原因',
+    `created_at`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_user_created_at` (`user_id`, `created_at`),
+    KEY `idx_resume_module_field_created` (`resume_id`, `module_id`, `field_type`, `field_index`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='字段级 AI 优化记录表';

@@ -1,0 +1,23 @@
+package com.zylo.resumecraft.dto;
+
+import lombok.Data;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Data
+public class AiFieldOptimizeRecordDTO {
+    private Long id;
+    private String status;
+    private String original;
+    private String reasoning;
+    private String streamedContent;
+    private String optimized;
+    private List<String> candidates;
+    private String error;
+    private String prompt;
+    private String systemPrompt;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+}
+

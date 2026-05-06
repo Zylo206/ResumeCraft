@@ -1,0 +1,41 @@
+server:
+  port: ${SERVER_PORT:0}
+  servlet:
+    context-path: /
+
+app:
+  environment: development
+  local:
+    enabled: true
+    open-browser: ${RESUMECRAFT_OPEN_BROWSER:true}
+    heartbeat-timeout-seconds: ${RESUMECRAFT_HEARTBEAT_TIMEOUT:30}
+    show-system-tray: ${RESUMECRAFT_SHOW_SYSTEM_TRAY:false}
+  cors:
+    allowed-origin-patterns: http://127.0.0.1:*,http://localhost:*
+
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+  devtools:
+    restart:
+      enabled: false
+    livereload:
+      enabled: false
+  datasource:
+    url: jdbc:h2:file:${resumecraft.data-dir}/data/resumecraft;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  h2:
+    console:
+      enabled: false
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+
+jwt:
+  access-token-expiration: 31536000000
+  refresh-token-expiration: 31536000000
