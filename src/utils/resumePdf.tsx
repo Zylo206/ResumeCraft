@@ -1115,6 +1115,8 @@ function ResumePdfDocument({
   const educationModules = sortedModules.filter((module) => module.moduleType === 'education')
   const projectModules = sortedModules.filter((module) => module.moduleType === 'project')
   const firstProjectModuleId = projectModules[0]?.id ?? null
+  const internshipModules = sortedModules.filter((module) => module.moduleType === 'internship')
+  const firstInternshipModuleId = internshipModules[0]?.id ?? null
   const awardModules = sortedModules
     .filter((module) => module.moduleType === 'award')
     .map((module) => normalizeAwardContent(module.content))
@@ -1362,6 +1364,36 @@ function ResumePdfDocument({
     )
   }
 
+  const renderInternshipPdfEntry = (internshipModule: ResumeModule) => {
+    const content = normalizeInternshipContent(internshipModule.content)
+    const titleLine = [content.company, content.position, content.projectName].filter(Boolean).join(' - ')
+
+    return (
+      <View key={internshipModule.id} style={styles.item}>
+        <View style={styles.rowBetween}>
+          <Text style={styles.strong}>{titleLine || '公司 - 职位 - 项目名'}</Text>
+          <Text style={styles.muted}>{formatMonthRange(content.startDate, content.endDate)}</Text>
+        </View>
+        {content.projectDescription ? (
+          <View style={styles.paragraph}>
+            {renderWrappedLabeledText(styles, '项目简介：', content.projectDescription, `internship-summary-${internshipModule.id}`)}
+          </View>
+        ) : null}
+        {content.techStack ? <Text style={styles.paragraph}><Text style={styles.label}>技术栈：</Text>{content.techStack}</Text> : null}
+        {content.responsibilities.length > 0 ? (
+          <View style={styles.paragraph}>
+            <Text><Text style={styles.label}>核心职责：</Text></Text>
+            {content.responsibilities.map((line, index) => (
+              <View key={`${index}-${line}`} style={styles.listItem}>
+                {renderOrderedItem(styles, line, index, `internship-duty-${internshipModule.id}-${index}`)}
+              </View>
+            ))}
+          </View>
+        ) : null}
+      </View>
+    )
+  }
+
   return (
     <Document onRender={onRender}>
       <Page size={pageSize} style={styles.page}>
@@ -1391,15 +1423,24 @@ function ResumePdfDocument({
             case 'basic_info':
             case 'education':
               return null
-            case 'internship':
+            case 'internship': {
+              if (module.id !== firstInternshipModuleId) {
+                return null
+              }
+
+              return (
+                <View key={module.id} style={sectionStyle}>
+                  <Text style={sectionTitleStyle}>{internshipSectionTitle}</Text>
+                  {internshipModules.map(renderInternshipPdfEntry)}
+                </View>
+              )
+            }
             case 'work_experience': {
               const content = normalizeInternshipContent(module.content)
               const titleLine = [content.company, content.position, content.projectName].filter(Boolean).join(' - ')
               return (
                 <View key={module.id} style={sectionStyle}>
-                  <Text style={sectionTitleStyle}>
-                    {module.moduleType === 'work_experience' ? workExperienceSectionTitle : internshipSectionTitle}
-                  </Text>
+                  <Text style={sectionTitleStyle}>{workExperienceSectionTitle}</Text>
                   <View style={styles.item}>
                     <View style={styles.rowBetween}>
                       <Text style={styles.strong}>{titleLine || '公司 - 职位 - 项目名'}</Text>

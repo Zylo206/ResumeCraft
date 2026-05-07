@@ -216,6 +216,8 @@ export function PreviewPanel({
   const firstEducationModuleId = educationModules[0]?.id ?? null
   const projectModules = sortedModules.filter((module) => module.moduleType === 'project')
   const firstProjectModuleId = projectModules[0]?.id ?? null
+  const internshipModules = sortedModules.filter((module) => module.moduleType === 'internship')
+  const firstInternshipModuleId = internshipModules[0]?.id ?? null
   const basicInfoContent = findBasicInfoContent(sortedModules)
   const visibleModules = sortedModules.filter((module) => {
     if (module.moduleType === 'job_intention') {
@@ -228,6 +230,10 @@ export function PreviewPanel({
 
     if (module.moduleType === 'project') {
       return module.id === firstProjectModuleId
+    }
+
+    if (module.moduleType === 'internship') {
+      return module.id === firstInternshipModuleId
     }
 
     return !(module.moduleType === 'award' && hasEducationModule)
@@ -334,6 +340,7 @@ export function PreviewPanel({
                     module={module}
                   modules={sortedModules}
                   projectModules={projectModules}
+                  internshipModules={internshipModules}
                   index={index}
                   basicInfoContent={basicInfoContent}
                   compactEducation={isCompactDensity}
@@ -594,6 +601,7 @@ function ModulePreviewSection({
   module,
   modules,
   projectModules,
+  internshipModules,
   index,
   basicInfoContent,
   compactEducation,
@@ -602,6 +610,7 @@ function ModulePreviewSection({
   module: ResumeModule
   modules: ResumeModule[]
   projectModules: ResumeModule[]
+  internshipModules: ResumeModule[]
   index: number
   basicInfoContent: ReturnType<typeof findBasicInfoContent>
   compactEducation: boolean
@@ -640,6 +649,43 @@ function ModulePreviewSection({
                 <div key={`${i}-${a}`} className="flex gap-2">
                   <span className="text-gray-400">•</span>
                   <p className="flex-1 leading-6 whitespace-pre-wrap">{renderInlineMarkdownText(a)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const renderInternshipEntry = (internshipModule: ResumeModule) => {
+    const content = normalizeInternshipContent(internshipModule.content)
+    const titleLine = [content.company, content.position, content.projectName].filter(Boolean).join(' - ')
+    return (
+      <div key={internshipModule.id} className="mb-4 space-y-1.5 last:mb-0">
+        <div className="flex justify-between items-start">
+          <div className="font-semibold text-gray-800">{titleLine || '公司 - 职位 - 项目名'}</div>
+          <span className="text-sm text-gray-400">
+            {formatMonthRange(content.startDate, content.endDate)}
+          </span>
+        </div>
+        {content.projectDescription && (
+          <p className="text-sm text-gray-600">
+            <span className="text-gray-500">项目简介：</span>
+            {content.projectDescription}
+          </p>
+        )}
+        {content.techStack && (
+          <p className="text-sm text-gray-500">技术栈：{content.techStack}</p>
+        )}
+        {content.responsibilities.length > 0 && (
+          <div className="text-sm text-gray-600">
+            <p className="text-gray-500">核心职责：</p>
+            <div className="mt-1 space-y-1 pl-4">
+              {content.responsibilities.map((line, index) => (
+                <div key={`${index}-${line}`} className="flex gap-2">
+                  <span className="text-gray-400">•</span>
+                  <p className="flex-1 leading-6 whitespace-pre-wrap">{renderInlineMarkdownText(line)}</p>
                 </div>
               ))}
             </div>
@@ -800,7 +846,9 @@ function ModulePreviewSection({
           </div>
         )
       }
-      case 'internship':
+      case 'internship': {
+        return <div>{internshipModules.map(renderInternshipEntry)}</div>
+      }
       case 'work_experience': {
         const content = normalizeInternshipContent(module.content)
         const titleLine = [content.company, content.position, content.projectName].filter(Boolean).join(' - ')
