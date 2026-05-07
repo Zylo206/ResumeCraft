@@ -1,0 +1,108 @@
+name: Build Desktop App
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            platform: mac
+            artifact_name: ResumeCraft-mac-arm64
+          - os: windows-latest
+            platform: win
+            artifact_name: ResumeCraft-win-x64
+
+    runs-on: ${{ matrix.os }}
+    name: Build (${{ matrix.platform }})
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Prepare .env for desktop build
+        run: |
+          echo "VITE_DESKTOP=true" > .env
+          echo "SERVER_PORT=8084" >> .env
+          echo "APP_ENV=development" >> .env
+          echo "JWT_SECRET=ci-build-placeholder-jwt-secret-32bytes!" >> .env
+          echo "DEV_ACCOUNT_EMAIL=test@example.com" >> .env
+          echo "DEV_ACCOUNT_PASSWORD=Test123456" >> .env
+        shell: bash
+
+      - name: Build frontend (desktop mode)
+        run: npm run build:desktop
+
+      - name: Build backend JAR
+        working-directory: server
+        run: mvn -DskipTests clean package
+
+      - name: jpackage (macOS)
+        if: matrix.platform == 'mac'
+        run: |
+          jpackage \
+            --type app-image \
+            --name ResumeCraft \
+            --dest target/mac-app \
+            --input server/target \
+            --main-jar resume-craft-server-0.1.0.jar \
+            --java-options "-Dspring.profiles.active=local" \
+            --java-options "-Dfile.encoding=UTF-8" \
+            --java-options "-Djava.awt.headless=false" \
+            --java-options "-DRESUMECRAFT_DESKTOP_APP=true" \
+            --mac-package-identifier com.zylo.resumecraft \
+            --mac-package-name ResumeCraft
+
+      - name: jpackage (Windows)
+        if: matrix.platform == 'win'
+        shell: pwsh
+        run: |
+          jpackage `
+            --type app-image `
+            --name ResumeCraft `
+            --dest target\win-app `
+            --input server\target `
+            --main-jar resume-craft-server-0.1.0.jar `
+            --java-options "-Dspring.profiles.active=local" `
+            --java-options "-Dfile.encoding=UTF-8" `
+            --java-options "-Djava.awt.headless=false" `
+            --java-options "-DRESUMECRAFT_DESKTOP_APP=true"
+
+      - name: Package (macOS)
+        if: matrix.platform == 'mac'
+        run: |
+          cd target/mac-app
+          zip -r ../../ResumeCraft-mac-arm64.zip ResumeCraft.app
+
+      - name: Package (Windows)
+        if: matrix.platform == 'win'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "target\win-app\ResumeCraft\*" -DestinationPath "ResumeCraft-win-x64.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ResumeCraft-${{ matrix.platform }}-*.zip
+          retention-days: 30
