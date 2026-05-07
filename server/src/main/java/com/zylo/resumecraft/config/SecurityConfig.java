@@ -30,6 +30,21 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
+        boolean isLocal = Boolean.getBoolean("app.local.enabled")
+                || "true".equals(System.getenv("RESUMECRAFT_DESKTOP_APP"));
+        if (isLocal) {
+            return new PasswordEncoder() {
+                @Override
+                public String encode(CharSequence raw) {
+                    return raw.toString();
+                }
+
+                @Override
+                public boolean matches(CharSequence raw, String encoded) {
+                    return raw.toString().equals(encoded);
+                }
+            };
+        }
         return new BCryptPasswordEncoder();
     }
 
@@ -63,6 +78,7 @@ public class SecurityConfig {
                     "/",
                     "/index.html",
                     "/favicon.svg",
+                    "/logo.png",
                     "/assets/**",
                     "/fonts/**",
                     "/dashboard/**",
@@ -77,7 +93,8 @@ public class SecurityConfig {
                     "/swagger-ui.html",
                     "/doc.html",
                     "/webjars/**",
-                    "/desktop/**"
+                    "/desktop/**",
+                    "/ai-config"
                 ).permitAll()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()

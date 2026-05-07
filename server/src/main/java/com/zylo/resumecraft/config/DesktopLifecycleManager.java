@@ -166,7 +166,7 @@ public class DesktopLifecycleManager implements ApplicationListener<WebServerIni
                 if (os.contains("mac")) {
                     new ProcessBuilder("open", url).start();
                 } else {
-                    new ProcessBuilder("cmd", "/c", "start", "", url).start();
+                    new ProcessBuilder("explorer.exe", url).start();
                 }
             }
         } catch (Exception exception) {

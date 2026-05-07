@@ -9,6 +9,17 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+            'vendor-pdf': ['@react-pdf/renderer', 'pdfjs-dist'],
+            'vendor-motion': ['framer-motion'],
+          },
+        },
+      },
+    },
     server: {
       port: Number.isNaN(port) ? 5173 : port,
       open: true,

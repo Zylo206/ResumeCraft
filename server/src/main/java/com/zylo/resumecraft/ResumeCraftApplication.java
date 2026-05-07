@@ -16,10 +16,35 @@ public class ResumeCraftApplication {
 
     public static void main(String[] args) {
         LoadingWindow.show();
-        configureLocalDataDir();
-        SpringApplication app = new SpringApplication(ResumeCraftApplication.class);
-        app.addInitializers(new DotenvConfig());
-        app.run(args);
+        try {
+            configureLocalDataDir();
+            SpringApplication app = new SpringApplication(ResumeCraftApplication.class);
+            app.addInitializers(new DotenvConfig());
+            app.run(args);
+        } catch (Exception exception) {
+            LoadingWindow.close();
+            showErrorDialog(exception);
+            System.exit(1);
+        }
+    }
+
+    private static void showErrorDialog(Exception exception) {
+        String raw = exception.getMessage();
+        final String message = (raw == null || raw.isBlank())
+                ? exception.getClass().getSimpleName()
+                : raw;
+
+        try {
+            javax.swing.SwingUtilities.invokeAndWait(() -> {
+                javax.swing.JOptionPane.showMessageDialog(null,
+                        "ResumeCraft 启动失败：\n" + message,
+                        "ResumeCraft",
+                        javax.swing.JOptionPane.ERROR_MESSAGE);
+            });
+        } catch (Exception ignored) {
+            System.err.println("ResumeCraft startup failed: " + message);
+            exception.printStackTrace();
+        }
     }
 
     private static void configureLocalDataDir() {

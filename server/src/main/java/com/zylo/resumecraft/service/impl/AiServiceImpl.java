@@ -11,9 +11,11 @@ import com.zylo.resumecraft.dto.SmartOnePagePreviewMetaDTO;
 import com.zylo.resumecraft.dto.SmartOnePagePreviewRequestDTO;
 import com.zylo.resumecraft.dto.SmartOnePagePreviewResponseDTO;
 import com.zylo.resumecraft.entity.ResumeModule;
+import com.zylo.resumecraft.service.AiConfigService;
 import com.zylo.resumecraft.service.AiService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -87,20 +89,43 @@ public class AiServiceImpl implements AiService {
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 
-    @Value("${ai.api-key}")
-    private String apiKey;
+    @Autowired(required = false)
+    private AiConfigService aiConfigService;
 
-    @Value("${ai.base-url}")
-    private String baseUrl;
+    @Value("${ai.api-key:}")
+    private String defaultApiKey;
 
-    @Value("${ai.model}")
-    private String model;
+    @Value("${ai.base-url:https://api.deepseek.com/v1}")
+    private String defaultBaseUrl;
 
-    @Value("${ai.analysis-model:${ai.model}}")
-    private String analysisModel;
+    @Value("${ai.model:deepseek-chat}")
+    private String defaultModel;
+
+    @Value("${ai.analysis-model:${ai.model:deepseek-chat}}")
+    private String defaultAnalysisModel;
 
     @Value("${ai.timeout}")
     private int timeout;
+
+    private String resolveApiKey() {
+        if (aiConfigService != null) return aiConfigService.getApiKey();
+        return defaultApiKey;
+    }
+
+    private String resolveBaseUrl() {
+        if (aiConfigService != null) return aiConfigService.getBaseUrl();
+        return defaultBaseUrl;
+    }
+
+    private String resolveModel() {
+        if (aiConfigService != null) return aiConfigService.getModel();
+        return defaultModel;
+    }
+
+    private String resolveAnalysisModel() {
+        if (aiConfigService != null) return aiConfigService.getAnalysisModel();
+        return defaultAnalysisModel;
+    }
 
     @Value("${app.prompts.field-optimize.config-file:config/field-optimize-prompts.yml}")
     private String fieldOptimizePromptConfigFile;
@@ -271,7 +296,7 @@ public class AiServiceImpl implements AiService {
         var prompt = String.format(SYSTEM_PROMPT, contentJson);
 
         try {
-            var response = invokeChatCompletion(model, prompt, "请优化这份简历内容", 0.7, 4000, false, false);
+            var response = invokeChatCompletion(resolveModel(), prompt, "请优化这份简历内容", 0.7, 4000, false, false);
 
             if (response == null) {
                 throw new BusinessException(ResultCode.AI_SERVICE_BUSY);
@@ -308,7 +333,7 @@ public class AiServiceImpl implements AiService {
 
         try {
             var candidateOutput = plan.candidateOutput();
-            var targetModel = model;
+            var targetModel = resolveModel();
             var systemPrompt = resolveFieldSystemPrompt(request);
             var response = invokeChatCompletion(
                     targetModel,
@@ -335,7 +360,7 @@ public class AiServiceImpl implements AiService {
                     log.warn("[AI Optimize][Service] unusable project description candidates detected, retrying: moduleType={}, candidates={}",
                             plan.moduleType(), candidates.stream().map(item -> truncateText(item, 80)).toList());
                     var retryResponse = invokeChatCompletion(
-                            model,
+                            resolveModel(),
                             systemPrompt,
                             PROJECT_DESCRIPTION_RETRY_PROMPT.formatted(plan.originalText()),
                             0.35,
@@ -406,7 +431,7 @@ public class AiServiceImpl implements AiService {
         emitStreamEvent(eventConsumer, "status", Map.of("message", "AI 已连接，正在生成结果。"));
 
         try {
-            var targetModel = model;
+            var targetModel = resolveModel();
             var systemPrompt = resolveFieldSystemPrompt(request);
             var streamResult = streamChatCompletion(
                     targetModel,
@@ -715,7 +740,7 @@ public class AiServiceImpl implements AiService {
 
         try {
             var response = invokeChatCompletion(
-                    analysisModel,
+                    resolveAnalysisModel(),
                     "你是一位严格、专业、懂技术招聘的资深简历顾问。你需要基于候选人当前简历内容给出真实、克制、可执行的分析结果，并且必须严格输出 JSON。",
                     prompt,
                     0.3,
@@ -754,7 +779,7 @@ public class AiServiceImpl implements AiService {
 
         try {
             var streamResult = streamChatCompletion(
-                    analysisModel,
+                    resolveAnalysisModel(),
                     "你是一位严格、专业、懂技术招聘的资深简历顾问。你需要基于候选人当前简历内容给出真实、克制、可执行的分析结果，并且必须严格输出 JSON。",
                     prompt,
                     0.3,
@@ -995,7 +1020,7 @@ public class AiServiceImpl implements AiService {
         validateContentLength(module.getContent());
 
         var response = invokeChatCompletion(
-                model,
+                resolveModel(),
                 """
                 你是一位中文技术简历优化专家。
                 你的任务是把单个简历模块压缩为更适合一页/两页投递的表达。
@@ -1247,13 +1272,13 @@ public class AiServiceImpl implements AiService {
 
     private void validateConfiguration() {
         var missing = new ArrayList<String>();
-        if (apiKey == null || apiKey.isBlank()) {
+        if (resolveApiKey() == null || resolveApiKey().isBlank()) {
             missing.add("AI_API_KEY");
         }
-        if (baseUrl == null || baseUrl.isBlank()) {
+        if (resolveBaseUrl() == null || resolveBaseUrl().isBlank()) {
             missing.add("AI_BASE_URL");
         }
-        if (model == null || model.isBlank()) {
+        if (resolveModel() == null || resolveModel().isBlank()) {
             missing.add("AI_MODEL");
         }
         if (!missing.isEmpty()) {
@@ -1324,7 +1349,7 @@ public class AiServiceImpl implements AiService {
 
         return webClient.post()
                 .uri(buildChatCompletionUrl())
-                .header("Authorization", "Bearer " + apiKey)
+                .header("Authorization", "Bearer " + resolveApiKey())
                 .header("Content-Type", "application/json")
                 .bodyValue(requestBody)
                 .retrieve()
@@ -1358,7 +1383,7 @@ public class AiServiceImpl implements AiService {
         var request = HttpRequest.newBuilder()
                 .uri(URI.create(buildChatCompletionUrl()))
                 .timeout(Duration.ofSeconds(Math.max(timeout, 180)))
-                .header("Authorization", "Bearer " + apiKey)
+                .header("Authorization", "Bearer " + resolveApiKey())
                 .header("Content-Type", "application/json")
                 .header("Accept", "text/event-stream")
                 .POST(HttpRequest.BodyPublishers.ofString(requestJson, StandardCharsets.UTF_8))
@@ -1402,10 +1427,11 @@ public class AiServiceImpl implements AiService {
     }
 
     private String buildChatCompletionUrl() {
-        if (baseUrl.endsWith("/chat/completions")) {
-            return baseUrl;
+        String url = resolveBaseUrl();
+        if (url.endsWith("/chat/completions")) {
+            return url;
         }
-        return baseUrl + "/chat/completions";
+        return url + "/chat/completions";
     }
 
     private String buildUpstreamErrorMessage(WebClientResponseException e) {

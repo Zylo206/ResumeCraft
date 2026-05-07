@@ -620,3 +620,15 @@ export const resumeApi = {
       })
     ),
 }
+
+export interface AiConfig {
+  apiKey: string
+  baseUrl: string
+  model: string
+  analysisModel: string
+}
+
+export const aiConfigApi = {
+  get: () => client.get<ApiEnvelope<AiConfig>>('/ai-config'),
+  update: (data: Partial<AiConfig>) => client.put<ApiEnvelope<AiConfig>>('/ai-config', data),
+}

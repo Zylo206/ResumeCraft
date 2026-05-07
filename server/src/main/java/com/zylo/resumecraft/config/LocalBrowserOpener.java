@@ -38,7 +38,7 @@ public class LocalBrowserOpener implements ApplicationListener<WebServerInitiali
             if (os.contains("mac")) {
                 new ProcessBuilder("open", url).start();
             } else {
-                new ProcessBuilder("cmd", "/c", "start", "", url).start();
+                new ProcessBuilder("explorer.exe", url).start();
             }
         } catch (Exception exception) {
             log.warn("Failed to open browser automatically. Please open {}", url, exception);

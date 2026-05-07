@@ -14,17 +14,27 @@ app:
     allowed-origin-patterns: http://127.0.0.1:*,http://localhost:*
 
 spring:
+  main:
+    lazy-initialization: true
+  jmx:
+    enabled: false
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
       - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+      - org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration
+      - org.springframework.boot.autoconfigure.freemarker.FreeMarkerAutoConfiguration
+      - org.springframework.boot.autoconfigure.mustache.MustacheAutoConfiguration
+      - org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration
+      - org.springframework.boot.autoconfigure.gson.GsonAutoConfiguration
+      - org.springframework.boot.actuate.autoconfigure.security.servlet.ManagementWebSecurityAutoConfiguration
   devtools:
     restart:
       enabled: false
     livereload:
       enabled: false
   datasource:
-    url: jdbc:h2:file:${resumecraft.data-dir}/data/resumecraft;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    url: jdbc:h2:file:${resumecraft.data-dir}/data/resumecraft;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;AUTO_SERVER=TRUE;TRACE_LEVEL_FILE=0;TRACE_LEVEL_SYSTEM_OUT=0
     username: sa
     password:
     driver-class-name: org.h2.Driver
@@ -39,3 +49,12 @@ mybatis-plus:
 jwt:
   access-token-expiration: 31536000000
   refresh-token-expiration: 31536000000
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+knife4j:
+  enable: false

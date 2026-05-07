@@ -1,11 +1,12 @@
-import { useEffect } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useDesktopHeartbeat } from './hooks/useDesktopHeartbeat'
-import DashboardPage from './pages/DashboardPage'
-import EditorPage from './pages/EditorPage'
-import FieldOptimizePage from './pages/FieldOptimizePage'
-import ChromePreviewPage from './pages/ChromePreviewPage'
 import { useAuthStore } from './store/authStore'
+
+const DashboardPage = lazy(() => import('./pages/DashboardPage'))
+const EditorPage = lazy(() => import('./pages/EditorPage'))
+const FieldOptimizePage = lazy(() => import('./pages/FieldOptimizePage'))
+const ChromePreviewPage = lazy(() => import('./pages/ChromePreviewPage'))
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, initialized } = useAuthStore()
@@ -17,7 +18,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4 text-sm text-red-600">
-        本地自动登录失败，请确认后端已启动并存在 test@example.com / Test123456。
+        本地自动登录失败，请确认后端已启动。
       </div>
     )
   }
@@ -35,6 +36,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-sm text-gray-400">加载中...</div>}>
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/login" element={<Navigate to="/dashboard" replace />} />
@@ -73,6 +75,7 @@ function App() {
         />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
   )
 }

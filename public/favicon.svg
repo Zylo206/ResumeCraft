@@ -1,25 +1,32 @@
 <svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="64" cy="64" r="58" fill="white"/>
-  <circle cx="64" cy="64" r="57.5" stroke="#DBEAFE"/>
-  <circle cx="48" cy="40" r="20" fill="url(#glow)"/>
-  <rect x="22" y="29" width="84" height="26" rx="13" fill="url(#topBar)"/>
-  <rect x="37" y="49" width="20" height="48" rx="10" fill="url(#pillar)"/>
-  <rect x="71" y="49" width="20" height="48" rx="10" fill="url(#pillar)"/>
+  <rect width="128" height="128" rx="28" fill="white"/>
+
+  <g filter="url(#softShadow)">
+    <!-- top flowing stroke -->
+    <path d="M26.5 51.5C26.5 39.2 37.2 29 51 29H83.8C94.7 29 101.8 36.2 101.8 45.4C101.8 49.6 100.3 53.5 97.7 56.8L74.6 86H91.3C99.5 86 106.5 81.3 110.2 74.2C111.8 71.2 116.4 72.3 116.4 75.8V83.5C116.4 96.1 105.5 106 91.3 106H44.4C34.2 106 28.1 94.8 34.2 86.7L57.3 56H37.8C34.2 56 31 58.1 29.5 61.4C28.3 64 24.4 63.2 24.4 60.3V55.4C24.4 54.1 25.2 52.6 26.5 51.5Z" fill="url(#ribbonMain)"/>
+
+    <!-- inner negative-space cut, simulated by white path -->
+    <path d="M41.8 78.5L60.9 53.2C63.9 49.2 68.6 46.8 73.6 46.8H86.4L63.8 77.4H97.8L91.4 85.5C88.4 89.3 83.8 91.5 78.9 91.5H44.4C38.4 91.5 36.4 85.7 39.9 81.2L41.8 78.5Z" fill="white"/>
+
+    <!-- subtle lower purple overlay -->
+    <path d="M36.3 90.2C39.5 86.2 44.3 83.8 49.4 83.8H91.5C99.1 83.8 105.9 79.9 109.8 73.3C111.5 70.5 116 71.6 116 74.9V83.1C116 95.9 105.2 106 91.2 106H44.3C34.2 106 28.1 94.7 34.3 86.7L36.3 90.2Z" fill="url(#purpleOverlay)" fill-opacity="0.72"/>
+  </g>
+
   <defs>
-    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(48 42) rotate(47.49) scale(33.0492)">
-      <stop stop-color="#93C5FD" stop-opacity="0.24"/>
-      <stop offset="1" stop-color="#93C5FD" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="topBar" x1="64" y1="30" x2="64" y2="54" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#79B2FF"/>
-      <stop offset="0.48" stop-color="#4B86F5"/>
-      <stop offset="1" stop-color="#3369E8"/>
+    <filter id="softShadow" x="18" y="24" width="104" height="89" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="#2563EB" flood-opacity="0.16"/>
+    </filter>
+
+    <linearGradient id="ribbonMain" x1="25" y1="34" x2="108" y2="101" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#16C7F3"/>
+      <stop offset="0.45" stop-color="#2F6BFF"/>
+      <stop offset="1" stop-color="#8B2BFF"/>
     </linearGradient>
-    <linearGradient id="pillar" x1="47" y1="49" x2="47" y2="96" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#B7D6FF"/>
-      <stop offset="0.3" stop-color="#7CAEFF"/>
-      <stop offset="0.62" stop-color="#4F87F2"/>
-      <stop offset="1" stop-color="#3369E8"/>
+
+    <linearGradient id="purpleOverlay" x1="34" y1="84" x2="113" y2="103" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#315BFF" stop-opacity="0.25"/>
+      <stop offset="0.55" stop-color="#6D28D9" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#A855F7"/>
     </linearGradient>
   </defs>
 </svg>

@@ -151,7 +151,8 @@ client.interceptors.response.use(
         processQueue(refreshError, null)
         localStorage.removeItem('accessToken')
         localStorage.removeItem('refreshToken')
-        window.location.href = '/login'
+        // 刷新页面让 ensureLocalSession 重新处理，避免 /login 重定向死循环
+        window.location.reload()
         return Promise.reject(refreshError)
       } finally {
         isRefreshing = false

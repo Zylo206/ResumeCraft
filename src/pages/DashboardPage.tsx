@@ -4,6 +4,7 @@ import type { ResumeListItem } from '../api/resume'
 import { useResumeStore } from '../store/resumeStore'
 import { Header } from '../components/layout/Header'
 import { ResumeCard } from '../components/dashboard/ResumeCard'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
@@ -13,6 +14,8 @@ export default function DashboardPage() {
   const [dialogMode, setDialogMode] = useState<'create' | 'rename' | null>(null)
   const [resumeTitle, setResumeTitle] = useState('')
   const [editingResume, setEditingResume] = useState<ResumeListItem | null>(null)
+  const [deletingResume, setDeletingResume] = useState<ResumeListItem | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     fetchResumeList()
@@ -69,11 +72,23 @@ export default function DashboardPage() {
     setEditingResume(null)
   }
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = (id: number) => {
+    const resume = resumeList.find((r) => r.id === id)
+    if (resume) {
+      setDeletingResume(resume)
+    }
+  }
+
+  const confirmDelete = async () => {
+    if (!deletingResume) return
+    setDeleting(true)
     try {
-      await deleteResume(id)
+      await deleteResume(deletingResume.id)
+      setDeletingResume(null)
     } catch (err) {
       console.error('删除失败:', err)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -127,6 +142,18 @@ export default function DashboardPage() {
           </div>
         )}
       </main>
+
+      <ConfirmDialog
+        open={Boolean(deletingResume)}
+        title="删除简历"
+        description={`确定要删除「${deletingResume?.title ?? ''}」吗？此操作无法撤销。`}
+        confirmText="删除"
+        cancelText="取消"
+        tone="danger"
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeletingResume(null)}
+      />
 
       {dialogMode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
