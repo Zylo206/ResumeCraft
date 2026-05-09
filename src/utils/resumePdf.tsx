@@ -245,6 +245,7 @@ interface ResumePdfTheme {
   inlineMetaColumnGap: number
   inlineMetaItemRight: number
   inlineMetaItemBottom: number
+  contactItemBottom: number
   chipGap: number
   chipTop: number
   chipFontSize: number
@@ -275,6 +276,7 @@ const COMPACT_DENSITY_BASELINE: Pick<
   | 'inlineMetaColumnGap'
   | 'inlineMetaItemRight'
   | 'inlineMetaItemBottom'
+  | 'contactItemBottom'
   | 'chipGap'
   | 'chipTop'
   | 'chipFontSize'
@@ -302,6 +304,7 @@ const COMPACT_DENSITY_BASELINE: Pick<
   inlineMetaColumnGap: 8,
   inlineMetaItemRight: 8,
   inlineMetaItemBottom: 2,
+  contactItemBottom: 2,
   chipGap: 4,
   chipTop: 2,
   chipFontSize: 8,
@@ -352,6 +355,7 @@ function getBaseResumePdfTheme(templateId: ResolvedResumePdfTemplateId): ResumeP
         inlineMetaColumnGap: 12,
         inlineMetaItemRight: 12,
         inlineMetaItemBottom: 4,
+        contactItemBottom: 3,
         chipGap: 5,
         chipTop: 3,
         chipFontSize: 8.4,
@@ -389,6 +393,7 @@ function getBaseResumePdfTheme(templateId: ResolvedResumePdfTemplateId): ResumeP
         inlineMetaColumnGap: 12,
         inlineMetaItemRight: 12,
         inlineMetaItemBottom: 4,
+        contactItemBottom: 3,
         chipGap: 6,
         chipTop: 4,
         chipFontSize: 8.8,
@@ -426,6 +431,7 @@ function getBaseResumePdfTheme(templateId: ResolvedResumePdfTemplateId): ResumeP
         inlineMetaColumnGap: 12,
         inlineMetaItemRight: 12,
         inlineMetaItemBottom: 4,
+        contactItemBottom: 3,
         chipGap: 6,
         chipTop: 4,
         chipFontSize: 9,
@@ -463,6 +469,7 @@ function getBaseResumePdfTheme(templateId: ResolvedResumePdfTemplateId): ResumeP
         inlineMetaColumnGap: 8,
         inlineMetaItemRight: 8,
         inlineMetaItemBottom: 2,
+        contactItemBottom: 2,
         chipGap: 4,
         chipTop: 2,
         chipFontSize: 8.2,
@@ -500,6 +507,7 @@ function getBaseResumePdfTheme(templateId: ResolvedResumePdfTemplateId): ResumeP
         inlineMetaColumnGap: 12,
         inlineMetaItemRight: 12,
         inlineMetaItemBottom: 4,
+        contactItemBottom: 3,
         chipGap: 6,
         chipTop: 4,
         chipFontSize: 8.9,
@@ -537,6 +545,7 @@ function getBaseResumePdfTheme(templateId: ResolvedResumePdfTemplateId): ResumeP
         inlineMetaColumnGap: 12,
         inlineMetaItemRight: 12,
         inlineMetaItemBottom: 4,
+        contactItemBottom: 3,
         chipGap: 6,
         chipTop: 4,
         chipFontSize: 9,
@@ -575,6 +584,7 @@ function getBaseResumePdfTheme(templateId: ResolvedResumePdfTemplateId): ResumeP
         inlineMetaColumnGap: 12,
         inlineMetaItemRight: 12,
         inlineMetaItemBottom: 4,
+        contactItemBottom: 3,
         chipGap: 6,
         chipTop: 4,
         chipFontSize: 9,
@@ -612,6 +622,7 @@ function applyDensityToResumePdfTheme(theme: ResumePdfTheme, density: ResumePdfD
     inlineMetaColumnGap: COMPACT_DENSITY_BASELINE.inlineMetaColumnGap,
     inlineMetaItemRight: COMPACT_DENSITY_BASELINE.inlineMetaItemRight,
     inlineMetaItemBottom: COMPACT_DENSITY_BASELINE.inlineMetaItemBottom,
+    contactItemBottom: COMPACT_DENSITY_BASELINE.contactItemBottom,
     chipGap: COMPACT_DENSITY_BASELINE.chipGap,
     chipTop: COMPACT_DENSITY_BASELINE.chipTop,
     chipFontSize: COMPACT_DENSITY_BASELINE.chipFontSize,
@@ -696,7 +707,16 @@ function createResumePdfStyles(theme: ResumePdfTheme) {
     contactRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: theme.contactGap,
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      color: theme.mutedColor,
+      fontSize: 9.5,
+    },
+    contactItem: {
+      marginRight: theme.contactGap,
+      marginBottom: theme.contactItemBottom,
+    },
+    contactPipe: {
       color: theme.mutedColor,
     },
     topSectionRow: {
@@ -721,6 +741,28 @@ function createResumePdfStyles(theme: ResumePdfTheme) {
       width: '100%',
       height: '100%',
       objectFit: 'cover',
+    },
+    nameTitle: {
+      fontSize: 24,
+      fontWeight: 700,
+      letterSpacing: 0.8,
+      marginBottom: 10,
+      color: theme.bodyColor,
+    },
+    jobTitle: {
+      fontSize: 11,
+      color: theme.mutedColor,
+      marginBottom: 10,
+    },
+    summaryText: {
+      marginTop: 6,
+      color: theme.bodyColor,
+      fontSize: theme.baseFontSize,
+      lineHeight: theme.lineHeight,
+    },
+    photoFrameBordered: {
+      borderWidth: 1,
+      borderColor: '#d1d5db',
     },
     section: {
       marginBottom: theme.sectionGap,
@@ -774,7 +816,8 @@ function createResumePdfStyles(theme: ResumePdfTheme) {
     chips: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: theme.chipGap,
+      alignItems: 'center',
+      justifyContent: 'flex-start',
       marginTop: theme.chipTop,
     },
     chip: {
@@ -784,6 +827,8 @@ function createResumePdfStyles(theme: ResumePdfTheme) {
       paddingHorizontal: theme.chipHorizontalPadding,
       paddingVertical: theme.chipVerticalPadding,
       borderRadius: 999,
+      marginRight: theme.chipGap,
+      marginBottom: theme.chipGap,
     },
     paragraph: {
       marginTop: theme.paragraphTop,
@@ -1039,7 +1084,7 @@ function buildFileName(modules: ResumeModule[], resumeId: number, options?: Resu
   const segments = [
     basicInfo?.name.trim() || '',
     education?.school.trim() || '',
-    basicInfo?.jobIntention.trim() || jobIntention?.targetPosition.trim() || '',
+    jobIntention?.targetPosition.trim() || '',
   ]
     .filter(Boolean)
     .map((part) => part.replace(/[\\/:*?"<>|]/g, '-').trim())
@@ -1108,7 +1153,7 @@ function ResumePdfDocument({
   const hasPhotoBorder = Boolean(basicInfo?.photoBorder)
   const jobIntentionModule = sortedModules.find((module) => module.moduleType === 'job_intention')
   const jobIntention = jobIntentionModule ? normalizeJobIntentionContent(jobIntentionModule.content) : null
-  const displayJobIntention = basicInfo?.jobIntention || jobIntention?.targetPosition || ''
+  const displayJobIntention = jobIntention?.targetPosition || ''
   const internshipSectionTitle = getModuleDisplayLabel('internship')
   const workExperienceSectionTitle = getModuleDisplayLabel('work_experience')
   const hasEducationModule = sortedModules.some((module) => module.moduleType === 'education')
@@ -1126,14 +1171,6 @@ function ResumePdfDocument({
     ...(isExecutive ? [{ backgroundColor: theme.sectionTitleColor, padding: 14, marginBottom: 16 }] : []),
     ...(isMinimal ? [{ marginBottom: 18 }] : []),
   ]
-  const headerTitleStyle = [
-    styles.title,
-    ...(isExecutive ? [{ color: '#f8fafc' }] : []),
-  ]
-  const headerSubtitleStyle = [
-    styles.subtitle,
-    ...(isExecutive ? [{ color: '#e2e8f0' }] : []),
-  ]
   const headerLabelStyle = [
     styles.label,
     ...(isExecutive ? [{ color: theme.sectionTitleBorderColor }] : []),
@@ -1145,6 +1182,14 @@ function ResumePdfDocument({
   const headerLinkStyle = [
     styles.link,
     ...(isExecutive ? [{ color: '#ffffff' }] : []),
+  ]
+  const headerNameTitleStyle = [
+    ...(isCompactDensity ? [{ fontSize: 20 }] : []),
+    ...(isExecutive ? [{ color: '#f8fafc' }] : []),
+  ]
+  const headerJobTitleStyle = [
+    ...(isCompactDensity ? [{ fontSize: 10 }] : []),
+    ...(isExecutive ? [{ color: '#e2e8f0' }] : []),
   ]
   const sectionStyle = [
     styles.section,
@@ -1186,60 +1231,60 @@ function ResumePdfDocument({
       height: photoFrameHeight,
     },
     ...(hasPhotoBorder
-      ? [{
-          borderWidth: 1,
-          borderColor: isExecutive ? '#cbd5e1' : '#dbeafe',
-        }]
+      ? [styles.photoFrameBordered, ...(isExecutive ? [{ borderColor: '#cbd5e1' }] : [])]
       : []),
   ]
 
-  const renderHeaderBlock = (styleOverrides: Array<{ marginBottom?: number }> = []) => (
-    basicInfo ? (
+  const renderHeaderBlock = (styleOverrides: Array<{ marginBottom?: number }> = []) => {
+    if (!basicInfo) return null
+
+    const contactItems: Array<{ label: string; value: string; isLink?: boolean }> = []
+    if (basicInfo.email) contactItems.push({ label: '邮箱', value: basicInfo.email })
+    if (basicInfo.phone) contactItems.push({ label: '手机号', value: basicInfo.phone })
+    if (basicInfo.wechat) contactItems.push({ label: '微信', value: basicInfo.wechat })
+    if (basicInfo.github) contactItems.push({ label: 'GitHub', value: basicInfo.github, isLink: true })
+    if (basicInfo.blog) contactItems.push({ label: '博客', value: basicInfo.blog, isLink: true })
+    if (basicInfo.hometown) contactItems.push({ label: '籍贯', value: basicInfo.hometown })
+    if (basicInfo.workYears) contactItems.push({ label: '工作年限', value: basicInfo.workYears })
+    if (basicInfo.targetCity) contactItems.push({ label: '意向城市', value: basicInfo.targetCity })
+    if (basicInfo.salaryRange) contactItems.push({ label: '期望薪资', value: basicInfo.salaryRange })
+    if (basicInfo.expectedEntryDate) contactItems.push({ label: '到岗时间', value: basicInfo.expectedEntryDate })
+    if (basicInfo.leetcode) contactItems.push({ label: 'LeetCode', value: basicInfo.leetcode })
+
+    return (
       <View style={[...headerContainerStyle, ...styleOverrides]}>
-        <View style={styles.headerRow}>
-          <Text style={headerTitleStyle}>
-            <Text style={headerLabelStyle}>姓名：</Text>
-            {basicInfo.name || '未填写'}
-          </Text>
-          {displayJobIntention ? (
-            <Text style={headerSubtitleStyle}>
-              <Text style={headerLabelStyle}>求职意向：</Text>
-              {displayJobIntention}
-            </Text>
-          ) : null}
-        </View>
+        {basicInfo.name ? (
+          <Text style={[styles.nameTitle, ...headerNameTitleStyle]}>{basicInfo.name}</Text>
+        ) : null}
+        {displayJobIntention ? (
+          <Text style={[styles.jobTitle, ...headerJobTitleStyle]}>{displayJobIntention}</Text>
+        ) : null}
         <View style={headerContactStyle}>
-          {basicInfo.email ? <Text><Text style={headerLabelStyle}>邮箱：</Text>{basicInfo.email}</Text> : null}
-          {basicInfo.phone ? <Text><Text style={headerLabelStyle}>手机号：</Text>{basicInfo.phone}</Text> : null}
-          {basicInfo.wechat ? <Text><Text style={headerLabelStyle}>微信：</Text>{basicInfo.wechat}</Text> : null}
-          {basicInfo.targetCity ? <Text><Text style={headerLabelStyle}>意向城市：</Text>{basicInfo.targetCity}</Text> : null}
-          {basicInfo.salaryRange ? <Text><Text style={headerLabelStyle}>期望薪资：</Text>{basicInfo.salaryRange}</Text> : null}
-          {basicInfo.expectedEntryDate ? <Text><Text style={headerLabelStyle}>到岗时间：</Text>{basicInfo.expectedEntryDate}</Text> : null}
-          {basicInfo.github ? (
-            <Text>
-              <Text style={headerLabelStyle}>GitHub：</Text>
-              <Link src={normalizeExternalUrl(basicInfo.github)} style={headerLinkStyle}>{basicInfo.github}</Link>
+          {contactItems.map((item, index) => (
+            <Text key={item.label} style={styles.contactItem}>
+              {item.isLink ? (
+                <Text>
+                  <Text style={headerLabelStyle}>{item.label}：</Text>
+                  <Link src={normalizeExternalUrl(item.value)} style={headerLinkStyle}>{item.value}</Link>
+                </Text>
+              ) : (
+                <Text>
+                  <Text style={headerLabelStyle}>{item.label}：</Text>
+                  {item.value}
+                </Text>
+              )}
+              {index < contactItems.length - 1 ? <Text style={styles.contactPipe}> | </Text> : null}
             </Text>
-          ) : null}
-          {basicInfo.blog ? (
-            <Text>
-              <Text style={headerLabelStyle}>博客：</Text>
-              <Link src={normalizeExternalUrl(basicInfo.blog)} style={headerLinkStyle}>{basicInfo.blog}</Link>
-            </Text>
-          ) : null}
-          {basicInfo.hometown ? <Text><Text style={headerLabelStyle}>籍贯：</Text>{basicInfo.hometown}</Text> : null}
-          {basicInfo.workYears ? <Text><Text style={headerLabelStyle}>工作年限：</Text>{basicInfo.workYears}</Text> : null}
-          {basicInfo.leetcode ? <Text><Text style={headerLabelStyle}>LeetCode：</Text>{basicInfo.leetcode}</Text> : null}
+          ))}
         </View>
         {basicInfo.summary ? (
-          <Text style={[styles.paragraph, ...(isExecutive ? [{ color: '#e2e8f0' }] : [])]}>
-            <Text style={headerLabelStyle}>个人总结：</Text>
+          <Text style={[styles.summaryText, ...(isExecutive ? [{ color: '#e2e8f0' }] : [])]}>
             {basicInfo.summary}
           </Text>
         ) : null}
       </View>
-    ) : null
-  )
+    )
+  }
 
   const renderEducationBlock = (styleOverrides: Array<{ marginBottom?: number }> = []) => (
     educationModules.length > 0 ? (
