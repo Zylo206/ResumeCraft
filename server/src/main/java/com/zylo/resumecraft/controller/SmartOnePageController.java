@@ -56,7 +56,7 @@ public class SmartOnePageController {
             throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "请先完善简历内容后再生成智能一页");
         }
 
-        return Result.success(aiService.previewSmartOnePage(resume.getTitle(), modules, request));
+        return Result.success(aiService.previewSmartOnePage(resume.getTitle(), modules, request, resume.getLanguage()));
     }
 
     private Long getCurrentUserId() {

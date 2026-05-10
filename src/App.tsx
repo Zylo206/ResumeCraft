@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect } from 'react'
+import { Suspense, lazy, useEffect, useRef } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { useDesktopHeartbeat } from './hooks/useDesktopHeartbeat'
 import { useAuthStore } from './store/authStore'
@@ -29,9 +29,38 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function App() {
   useDesktopHeartbeat()
   const ensureLocalSession = useAuthStore((state) => state.ensureLocalSession)
+  const lastSessionCheckRef = useRef(0)
 
   useEffect(() => {
     void ensureLocalSession()
+  }, [ensureLocalSession])
+
+  useEffect(() => {
+    if (import.meta.env.VITE_DESKTOP !== 'true') {
+      return
+    }
+
+    const SESSION_CHECK_DEBOUNCE_MS = 3_000
+
+    const restoreSession = () => {
+      if (document.hidden) {
+        return
+      }
+      const now = Date.now()
+      if (now - lastSessionCheckRef.current < SESSION_CHECK_DEBOUNCE_MS) {
+        return
+      }
+      lastSessionCheckRef.current = now
+      void ensureLocalSession()
+    }
+
+    document.addEventListener('visibilitychange', restoreSession)
+    window.addEventListener('focus', restoreSession)
+
+    return () => {
+      document.removeEventListener('visibilitychange', restoreSession)
+      window.removeEventListener('focus', restoreSession)
+    }
   }, [ensureLocalSession])
 
   return (

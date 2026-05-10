@@ -17,6 +17,7 @@ interface WorkerInput {
     density?: string
     accentPreset?: string
     headingStyle?: string
+    language?: 'zh-CN' | 'en-US'
   }
 }
 

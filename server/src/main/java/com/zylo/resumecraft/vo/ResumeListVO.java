@@ -8,6 +8,7 @@ public class ResumeListVO {
     private Long id;
     private String title;
     private String templateId;
+    private String language;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

@@ -54,14 +54,14 @@ public class AiController {
     @PostMapping("/ai-optimize")
     public Result<Map<String, Object>> aiOptimize(@PathVariable Long resumeId, @PathVariable Long moduleId) {
         var userId = getCurrentUserId();
-        validateOwnership(resumeId, userId);
+        var resume = validateOwnership(resumeId, userId);
 
         var module = moduleMapper.selectById(moduleId);
         if (module == null || !module.getResumeId().equals(resumeId)) {
             throw new BusinessException(ResultCode.MODULE_NOT_FOUND);
         }
 
-        var result = aiService.optimizeModule(module.getModuleType(), module.getContent());
+        var result = aiService.optimizeModule(module.getModuleType(), module.getContent(), resume.getLanguage());
         return Result.success(result);
     }
 
@@ -75,14 +75,14 @@ public class AiController {
         var userId = getCurrentUserId();
         log.info("[AI Optimize][Controller] received field optimize request: resumeId={}, moduleId={}, userId={}, fieldType={}, index={}",
                 resumeId, moduleId, userId, request == null ? null : request.getFieldType(), request == null ? null : request.getIndex());
-        validateOwnership(resumeId, userId);
+        var resume = validateOwnership(resumeId, userId);
 
         var module = moduleMapper.selectById(moduleId);
         if (module == null || !module.getResumeId().equals(resumeId)) {
             throw new BusinessException(ResultCode.MODULE_NOT_FOUND);
         }
 
-        var result = aiService.optimizeModuleField(module.getModuleType(), module.getContent(), request);
+        var result = aiService.optimizeModuleField(module.getModuleType(), module.getContent(), request, resume.getLanguage());
         log.info("[AI Optimize][Controller] field optimize response ready: resumeId={}, moduleId={}, moduleType={}, keys={}",
                 resumeId, moduleId, module.getModuleType(), result.keySet());
         return Result.success(result);
@@ -99,7 +99,7 @@ public class AiController {
         var userId = getCurrentUserId();
         log.info("[AI Optimize][Controller] received field optimize stream request: resumeId={}, moduleId={}, userId={}, fieldType={}, index={}",
                 resumeId, moduleId, userId, request == null ? null : request.getFieldType(), request == null ? null : request.getIndex());
-        validateOwnership(resumeId, userId);
+        var resume = validateOwnership(resumeId, userId);
 
         var module = moduleMapper.selectById(moduleId);
         if (module == null || !module.getResumeId().equals(resumeId)) {
@@ -129,7 +129,8 @@ public class AiController {
                     event -> {
                         captureStreamSnapshot(snapshot, event);
                         sendSseEvent(response, String.valueOf(event.getOrDefault("type", "message")), event);
-                    }
+                    },
+                    resume.getLanguage()
             );
 
             aiOptimizeRecordService.save(buildCompletedRecord(
@@ -196,11 +197,12 @@ public class AiController {
         return Result.success(aiOptimizeRecordService.getLatestRecord(userId, resumeId, moduleId, fieldType, index));
     }
 
-    private void validateOwnership(Long resumeId, Long userId) {
+    private com.zylo.resumecraft.entity.Resume validateOwnership(Long resumeId, Long userId) {
         var resume = resumeMapper.selectById(resumeId);
         if (resume == null || !resume.getUserId().equals(userId) || resume.getStatus() == 0) {
             throw new BusinessException(ResultCode.RESUME_NOT_FOUND);
         }
+        return resume;
     }
 
     private Long getCurrentUserId() {

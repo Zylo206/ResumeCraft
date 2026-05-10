@@ -26,7 +26,8 @@ import {
 } from './moduleContent'
 import { parseInlineMarkdownSegments } from './inlineMarkdown'
 import { normalizePhotoSource } from './resumePhoto'
-import { getModuleDisplayLabel } from './resumeDisplay'
+import { getModuleDisplayLabel, normalizeResumeLanguage } from './resumeDisplay'
+import type { ResumeLanguage } from '../api/resume'
 
 function resolveFontSource(fileName: string) {
   if (typeof window === 'undefined') {
@@ -52,6 +53,7 @@ export interface ResumePdfOptions {
   density?: ResumePdfDensity
   accentPreset?: ResumePdfAccentPreset
   headingStyle?: ResumePdfHeadingStyle
+  language?: ResumeLanguage
 }
 
 export type ResumePdfPageMode = NonNullable<ResumePdfOptions['pageMode']>
@@ -1124,6 +1126,7 @@ function ResumePdfDocument({
   density = DEFAULT_RESUME_PDF_PREVIEW_CONFIG.density,
   accentPreset = DEFAULT_RESUME_PDF_PREVIEW_CONFIG.accentPreset,
   headingStyle = DEFAULT_RESUME_PDF_PREVIEW_CONFIG.headingStyle,
+  language = 'zh-CN',
   onRender,
 }: {
   modules: ResumeModule[]
@@ -1132,6 +1135,7 @@ function ResumePdfDocument({
   density?: ResumePdfDensity
   accentPreset?: ResumePdfAccentPreset
   headingStyle?: ResumePdfHeadingStyle
+  language?: ResumeLanguage
   onRender?: (props: unknown) => void
 }) {
   const resolvedThemeConfig = getResolvedResumePdfThemeConfig({ templateId, density, accentPreset, headingStyle })
@@ -1154,8 +1158,8 @@ function ResumePdfDocument({
   const jobIntentionModule = sortedModules.find((module) => module.moduleType === 'job_intention')
   const jobIntention = jobIntentionModule ? normalizeJobIntentionContent(jobIntentionModule.content) : null
   const displayJobIntention = jobIntention?.targetPosition || ''
-  const internshipSectionTitle = getModuleDisplayLabel('internship')
-  const workExperienceSectionTitle = getModuleDisplayLabel('work_experience')
+  const internshipSectionTitle = getModuleDisplayLabel('internship', null, language)
+  const workExperienceSectionTitle = getModuleDisplayLabel('work_experience', null, language)
   const hasEducationModule = sortedModules.some((module) => module.moduleType === 'education')
   const educationModules = sortedModules.filter((module) => module.moduleType === 'education')
   const projectModules = sortedModules.filter((module) => module.moduleType === 'project')
@@ -1289,7 +1293,7 @@ function ResumePdfDocument({
   const renderEducationBlock = (styleOverrides: Array<{ marginBottom?: number }> = []) => (
     educationModules.length > 0 ? (
       <View style={[...sectionStyle, ...styleOverrides]}>
-        <Text style={sectionTitleStyle}>教育背景</Text>
+        <Text style={sectionTitleStyle}>{getModuleDisplayLabel('education', null, language)}</Text>
         {educationModules.map((educationModule) => {
           const content = normalizeEducationContent(educationModule.content)
           const schoolTags = [
@@ -1518,7 +1522,7 @@ function ResumePdfDocument({
 
               return (
                 <View key={module.id} style={sectionStyle}>
-                  <Text style={sectionTitleStyle}>项目经历</Text>
+                  <Text style={sectionTitleStyle}>{getModuleDisplayLabel('project', null, language)}</Text>
                   {projectModules.map(renderProjectItem)}
                 </View>
               )
@@ -1527,7 +1531,7 @@ function ResumePdfDocument({
               const content = normalizeSkillContent(module.content)
               return (
                 <View key={module.id} style={sectionStyle}>
-                  <Text style={sectionTitleStyle}>专业技能</Text>
+                  <Text style={sectionTitleStyle}>{getModuleDisplayLabel('skill', null, language)}</Text>
                   {content.categories
                     .map((category) => ({
                       ...category,
@@ -1568,7 +1572,7 @@ function ResumePdfDocument({
               }
               return (
                 <View key={module.id} style={sectionStyle}>
-                  <Text style={sectionTitleStyle}>论文期刊</Text>
+                  <Text style={sectionTitleStyle}>{getModuleDisplayLabel('paper', null, language)}</Text>
                   <Text style={styles.strong}>{content.journalName || '论文'}</Text>
                   <Text>{[content.journalType, content.publishTime].filter(Boolean).join(' / ')}</Text>
                   {content.content ? <Text style={styles.paragraph}>{content.content}</Text> : null}
@@ -1582,7 +1586,7 @@ function ResumePdfDocument({
               }
               return (
                 <View key={module.id} style={sectionStyle}>
-                  <Text style={sectionTitleStyle}>科研经历</Text>
+                  <Text style={sectionTitleStyle}>{getModuleDisplayLabel('research', null, language)}</Text>
                   <Text style={styles.strong}>{content.projectName || '科研项目'}</Text>
                   {content.projectCycle ? <Text>{content.projectCycle}</Text> : null}
                   {content.background ? <Text style={styles.paragraph}>背景：{content.background}</Text> : null}
@@ -1598,7 +1602,7 @@ function ResumePdfDocument({
               const content = normalizeAwardContent(module.content)
               return (
                 <View key={module.id} style={sectionStyle}>
-                  <Text style={sectionTitleStyle}>获奖情况</Text>
+                  <Text style={sectionTitleStyle}>{getModuleDisplayLabel('award', null, language)}</Text>
                   <Text>
                     {content.awardName || '奖项'}
                     {content.awardTime ? `（${formatAwardDisplayTime(content.awardTime)}）` : ''}
@@ -1727,6 +1731,7 @@ async function renderResumePdfAsset(
       density={options?.density}
       accentPreset={options?.accentPreset}
       headingStyle={options?.headingStyle}
+      language={normalizeResumeLanguage(options?.language)}
       onRender={(props) => {
         const layout = props && typeof props === 'object'
           ? (props as { _INTERNAL__LAYOUT__DATA_?: unknown })._INTERNAL__LAYOUT__DATA_

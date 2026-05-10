@@ -16,6 +16,8 @@ public class Resume {
 
     private String templateId;
 
+    private String language;
+
     /** 状态: 0=已删除, 1=正常 */
     private Integer status;
 

@@ -5,6 +5,7 @@ interface ResumeCardProps {
   resume: ResumeListItem
   onDelete: (id: number) => void
   onRename: (resume: ResumeListItem) => void
+  onToggleLanguage: (resume: ResumeListItem) => void
 }
 
 const thumbnailThemes = [
@@ -34,7 +35,7 @@ const thumbnailThemes = [
   },
 ]
 
-export function ResumeCard({ resume, onDelete, onRename }: ResumeCardProps) {
+export function ResumeCard({ resume, onDelete, onRename, onToggleLanguage }: ResumeCardProps) {
   const navigate = useNavigate()
   const theme = thumbnailThemes[resume.id % thumbnailThemes.length]
 
@@ -50,6 +51,11 @@ export function ResumeCard({ resume, onDelete, onRename }: ResumeCardProps) {
     onRename(resume)
   }
 
+  const handleToggleLanguage = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onToggleLanguage(resume)
+  }
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
     return date.toLocaleDateString('zh-CN', {
@@ -63,16 +69,33 @@ export function ResumeCard({ resume, onDelete, onRename }: ResumeCardProps) {
     ? resume.templateId
     : '标准版'
 
+  const languageLabel = resume.language === 'en-US' ? 'English Resume' : '中文简历'
+  const toggleLanguageLabel = resume.language === 'en-US' ? '切换为中文' : '切换为英文'
+
   return (
     <div
       onClick={() => navigate(`/editor/${resume.id}`)}
       className="bg-white rounded-xl border border-gray-200 p-5 cursor-pointer hover:border-primary-300 hover:shadow-md transition-all group"
     >
       <div className="flex items-start justify-between mb-4">
-        <h3 className="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
-          {resume.title}
-        </h3>
+        <div className="min-w-0 flex-1">
+          <h3 className="font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">
+            {resume.title}
+          </h3>
+          <span className="mt-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+            {languageLabel}
+          </span>
+        </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={handleToggleLanguage}
+            className="text-gray-300 hover:text-primary-600 transition-colors p-1"
+            title={toggleLanguageLabel}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+            </svg>
+          </button>
           <button
             onClick={handleRename}
             className="text-gray-300 hover:text-primary-600 transition-colors p-1"
@@ -159,6 +182,8 @@ export function ResumeCard({ resume, onDelete, onRename }: ResumeCardProps) {
         <span>模板: {templateLabel}</span>
         <span>更新于 {formatDate(resume.updatedAt)}</span>
       </div>
+
+      <p className="mt-2 text-[11px] text-gray-300">仅切换语言标识，不会自动翻译已有内容。</p>
     </div>
   )
 }

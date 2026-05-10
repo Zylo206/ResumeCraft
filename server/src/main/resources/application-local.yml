@@ -8,7 +8,7 @@ app:
   local:
     enabled: true
     open-browser: ${RESUMECRAFT_OPEN_BROWSER:true}
-    heartbeat-timeout-seconds: ${RESUMECRAFT_HEARTBEAT_TIMEOUT:30}
+    heartbeat-timeout-seconds: ${RESUMECRAFT_HEARTBEAT_TIMEOUT:300}
     show-system-tray: ${RESUMECRAFT_SHOW_SYSTEM_TRAY:false}
   cors:
     allowed-origin-patterns: http://127.0.0.1:*,http://localhost:*

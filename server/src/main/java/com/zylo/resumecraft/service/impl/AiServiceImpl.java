@@ -62,8 +62,8 @@ public class AiServiceImpl implements AiService {
             重点要求：
             1. 重点看项目经历、工作经历、实习经历、专业技能，这几部分权重最高。
             2. 不要因为获奖较少、没有 AI 竞赛、没有 GPA、GitHub 没有额外包装，就明显拉低分数。
-            3. 不要把“专业技能没有分类展示”当成问题，也不要要求把整句技能改成分类标签。
-            4. 不要把“缺少个人简介 / 职业总结 / 自我评价”当成问题。
+            3. 不要把"专业技能没有分类展示"当成问题，也不要要求把整句技能改成分类标签。
+            4. 不要把"缺少个人简介 / 职业总结 / 自我评价"当成问题。
             5. 只有在确实存在明显短板时才指出问题，避免泛泛而谈。
             6. 对已经写得比较成熟的内容，尽量少挑边角问题。
             7. 如果整份简历主体已经可以直接投递，分数应落在 90 分以上。
@@ -84,6 +84,61 @@ public class AiServiceImpl implements AiService {
             "award", "获奖情况",
             "job_intention", "求职意向"
     );
+    private static final Map<String, String> EN_MODULE_LABELS = Map.of(
+            "basic_info", "Basic Information",
+            "education", "Education",
+            "internship", "Internship Experience",
+            "work_experience", "Work Experience",
+            "project", "Project Experience",
+            "skill", "Skills",
+            "paper", "Publications",
+            "research", "Research Experience",
+            "award", "Awards",
+            "job_intention", "Career Objective"
+    );
+    private static final String ENGLISH_RESUME_SYSTEM_PROMPT = """
+            You are a professional English resume writer for technical roles. Rewrite the following resume module JSON content in formal, concise, ATS-friendly English. Use strong action verbs (Designed, Developed, Implemented, Optimized, Integrated, Built, Led, Improved), emphasize technical stack, responsibilities, measurable outcomes, and business value where possible. Avoid casual wording, literal translation from Chinese, first-person pronouns (I, me, my, we), and exaggerated claims. Preserve all factual information and do not invent experience, metrics, awards, or company names.
+
+            Rules:
+            1. Maintain the exact same JSON structure as the input. Do not add, delete, or rename any keys. The output must be valid, parseable JSON.
+            2. Your response must contain only the optimized pure JSON content. Do not include any extra text, explanations, greetings, or Markdown code blocks like ```json ... ```.
+
+            Resume JSON content to optimize:
+            ---
+            %s
+            ---
+            """;
+    private static final String ENGLISH_ANALYSIS_INSTRUCTIONS = """
+            Analyze this resume from the perspective of a technical recruiter hiring for software engineering roles.
+
+            Focus areas:
+            1. Prioritize project experience, work experience, internship experience, and technical skills — these carry the highest weight.
+            2. Do not penalize for lack of awards, AI competitions, GPA, or GitHub profile packaging.
+            3. Do not flag "skills not categorized" as an issue.
+            4. Do not flag "missing personal summary / professional summary / self-evaluation" as an issue.
+            5. Only flag issues when there are genuine, significant problems.
+            6. For well-written content, avoid nitpicking minor details.
+            7. If the resume is ready for submission, the score should be 90+.
+
+            Output preferences:
+            1. Maximum 4 issues, maximum 4 suggestions.
+            2. Suggestions must be specific and actionable.
+            3. Prioritize issues that actually affect application outcomes.
+            """;
+
+    private static final String ANALYSIS_SYSTEM_PROMPT_ZH = "你是一位严格、专业、懂技术招聘的资深简历顾问。你需要基于候选人当前简历内容给出真实、克制、可执行的分析结果，并且必须严格输出 JSON。";
+    private static final String ANALYSIS_SYSTEM_PROMPT_EN = "You are a strict, professional, senior resume consultant with technical recruiting expertise. You must provide real, restrained, actionable analysis based on the candidate's current resume content, and must strictly output JSON.";
+
+    private static boolean isEnglishLanguage(String language) {
+        return "en-US".equals(language);
+    }
+
+    private static String resolveModuleLabel(String moduleType, String language) {
+        if (isEnglishLanguage(language)) {
+            return EN_MODULE_LABELS.getOrDefault(moduleType, MODULE_LABELS.getOrDefault(moduleType, moduleType));
+        }
+        return MODULE_LABELS.getOrDefault(moduleType, moduleType);
+    }
 
     private final WebClient webClient;
     private final HttpClient httpClient;
@@ -151,10 +206,10 @@ public class AiServiceImpl implements AiService {
     private static final String DEFAULT_FIELD_OPTIMIZE_SYSTEM_PROMPT = "你是一位严格、克制、结果导向的中文技术简历优化专家。";
     private static final String DEFAULT_FIELD_OPTIMIZE_CONFIG_PATH = "config/field-optimize-prompts.yml";
     private static final String INTERNSHIP_PROJECT_DESCRIPTION_PROMPT = """
-            你是一位技术简历专家，请只优化“项目简介”这一段原文，不要参考或扩写其他字段。
+            你是一位技术简历专家，请只优化"项目简介"这一段原文，不要参考或扩写其他字段。
 
             优化要求：
-            1. 突出“这是一个什么系统/平台、用到了哪些关键的技术栈、解决什么问题、核心价值是什么”。
+            1. 突出"这是一个什么系统/平台、用到了哪些关键的技术栈、解决什么问题、核心价值是什么"。
             2. 可以适当增加一些数据、业务规模。
             3. 输出 3 个版本，分别偏保守、偏标准、偏有张力，但都必须适合直接放进简历。
 
@@ -164,10 +219,10 @@ public class AiServiceImpl implements AiService {
             输出要求：
             - 只返回 JSON
             - JSON 结构必须是 {"candidates":["完整版本A","完整版本B","完整版本C"]}
-            - candidates 中的每一项都必须是完整可用的简历文案，严禁返回“版本1”“版本2”这类占位词
+            - candidates 中的每一项都必须是完整可用的简历文案，严禁返回"版本1""版本2"这类占位词
             """;
     private static final String INTERNSHIP_RESPONSIBILITY_PROMPT = """
-            你是一位技术简历专家，请只优化“工作经历 / 实习经历”中的一条核心职责。
+            你是一位技术简历专家，请只优化"工作经历 / 实习经历"中的一条核心职责。
 
             优化要求：
             1. 用了什么技术栈，解决了什么问题，实现了什么业务或能力。
@@ -197,13 +252,13 @@ public class AiServiceImpl implements AiService {
             - 如果你开启了思考并会在思考区展示分析过程，那么你必须在思考的最后额外输出一行固定格式：
               最终结果：{"candidates":["完整版本A","完整版本B","完整版本C"]}
             - 不要讨论输出格式，不要讨论 Markdown、代码块、系统提示词是否冲突
-            - candidates 中的每一项都必须是完整可用的简历文案，严禁返回“版本1”“版本2”这类占位词
+            - candidates 中的每一项都必须是完整可用的简历文案，严禁返回"版本1""版本2"这类占位词
             """;
     private static final String PROJECT_DESCRIPTION_PROMPT = """
-            你是一位技术简历专家，请只优化“项目描述”这一段原文，不要参考或扩写其他字段。
+            你是一位技术简历专家，请只优化"项目描述"这一段原文，不要参考或扩写其他字段。
 
             优化要求：
-            1. 突出“这是一个什么系统/平台、用到了哪些关键的技术栈、解决什么问题、核心价值是什么”。
+            1. 突出"这是一个什么系统/平台、用到了哪些关键的技术栈、解决什么问题、核心价值是什么"。
             2. 可以适当增加一些数据、业务规模。
             3. 输出 3 个版本，分别偏保守、偏标准、偏有张力，但都必须适合直接放进简历。
 
@@ -213,7 +268,7 @@ public class AiServiceImpl implements AiService {
             输出要求：
             - 只返回 JSON
             - JSON 结构必须是 {"candidates":["完整版本A","完整版本B","完整版本C"]}
-            - candidates 中的每一项都必须是完整可用的简历文案，严禁返回“版本1”“版本2”这类占位词
+            - candidates 中的每一项都必须是完整可用的简历文案，严禁返回"版本1""版本2"这类占位词
             """;
     private static final String PROJECT_DESCRIPTION_RETRY_PROMPT = """
             基于下面这段项目简介，直接输出 3 个可放进简历的候选版本。
@@ -221,14 +276,14 @@ public class AiServiceImpl implements AiService {
             要求：
             1. 只围绕原文改写，不补充任何额外背景。
             2. 每个版本 1-2 句话，至少 20 个字。
-            3. 不要写“版本1”“方向1”这类占位词。
+            3. 不要写"版本1""方向1"这类占位词。
             4. 只返回 JSON，格式必须是 {"candidates":["完整版本A","完整版本B","完整版本C"]}。
 
             原始项目简介：
             %s
             """;
     private static final String PROJECT_RESPONSIBILITY_PROMPT = """
-            你是一位技术简历专家，请只优化“项目经历”中的一条核心职责。
+            你是一位技术简历专家，请只优化"项目经历"中的一条核心职责。
 
             优化要求：
             1. 用了什么技术栈，解决了什么问题，实现了什么业务或能力。
@@ -257,7 +312,7 @@ public class AiServiceImpl implements AiService {
             - 如果你开启了思考并会在思考区展示分析过程，那么你必须在思考的最后额外输出一行固定格式：
               最终结果：{"candidates":["完整版本A","完整版本B","完整版本C"]}
             - 不要讨论输出格式，不要讨论 Markdown、代码块、系统提示词是否冲突
-            - candidates 中的每一项都必须是完整可用的简历文案，严禁返回“版本1”“版本2”这类占位词
+            - candidates 中的每一项都必须是完整可用的简历文案，严禁返回"版本1""版本2"这类占位词
             """;
 
     public AiServiceImpl(ObjectMapper objectMapper) {
@@ -289,14 +344,22 @@ public class AiServiceImpl implements AiService {
 
     @Override
     public Map<String, Object> optimizeModule(String moduleType, Map<String, Object> content) {
+        return optimizeModule(moduleType, content, null);
+    }
+
+    @Override
+    public Map<String, Object> optimizeModule(String moduleType, Map<String, Object> content, String language) {
         validateConfiguration();
         validateContentLength(content);
 
         var contentJson = toJsonString(content);
-        var prompt = String.format(SYSTEM_PROMPT, contentJson);
+        var systemPrompt = isEnglishLanguage(language)
+                ? String.format(ENGLISH_RESUME_SYSTEM_PROMPT, contentJson)
+                : String.format(SYSTEM_PROMPT, contentJson);
+        var userPrompt = isEnglishLanguage(language) ? "Optimize this resume content" : "请优化这份简历内容";
 
         try {
-            var response = invokeChatCompletion(resolveModel(), prompt, "请优化这份简历内容", 0.7, 4000, false, false);
+            var response = invokeChatCompletion(resolveModel(), systemPrompt, userPrompt, 0.7, 4000, false, false);
 
             if (response == null) {
                 throw new BusinessException(ResultCode.AI_SERVICE_BUSY);
@@ -322,6 +385,11 @@ public class AiServiceImpl implements AiService {
 
     @Override
     public Map<String, Object> optimizeModuleField(String moduleType, Map<String, Object> content, AiFieldOptimizeRequestDTO request) {
+        return optimizeModuleField(moduleType, content, request, null);
+    }
+
+    @Override
+    public Map<String, Object> optimizeModuleField(String moduleType, Map<String, Object> content, AiFieldOptimizeRequestDTO request, String language) {
         validateConfiguration();
         var plan = prepareFieldOptimizePlan(moduleType, content, request);
 
@@ -420,6 +488,17 @@ public class AiServiceImpl implements AiService {
             Map<String, Object> content,
             AiFieldOptimizeRequestDTO request,
             Consumer<Map<String, Object>> eventConsumer
+    ) {
+        return streamOptimizeModuleField(moduleType, content, request, eventConsumer, null);
+    }
+
+    @Override
+    public Map<String, Object> streamOptimizeModuleField(
+            String moduleType,
+            Map<String, Object> content,
+            AiFieldOptimizeRequestDTO request,
+            Consumer<Map<String, Object>> eventConsumer,
+            String language
     ) {
         validateConfiguration();
         var plan = prepareFieldOptimizePlan(moduleType, content, request);
@@ -734,14 +813,19 @@ public class AiServiceImpl implements AiService {
 
     @Override
     public ResumeAnalysisResultDTO analyzeResume(String resumeTitle, List<ResumeModule> modules, String promptOverride) {
+        return analyzeResume(resumeTitle, modules, promptOverride, null);
+    }
+
+    @Override
+    public ResumeAnalysisResultDTO analyzeResume(String resumeTitle, List<ResumeModule> modules, String promptOverride, String language) {
         validateConfiguration();
 
-        var prompt = buildResumeAnalysisPrompt(resumeTitle, modules, promptOverride);
+        var prompt = buildResumeAnalysisPrompt(resumeTitle, modules, promptOverride, language);
 
         try {
             var response = invokeChatCompletion(
                     resolveAnalysisModel(),
-                    "你是一位严格、专业、懂技术招聘的资深简历顾问。你需要基于候选人当前简历内容给出真实、克制、可执行的分析结果，并且必须严格输出 JSON。",
+                    isEnglishLanguage(language) ? ANALYSIS_SYSTEM_PROMPT_EN : ANALYSIS_SYSTEM_PROMPT_ZH,
                     prompt,
                     0.3,
                     1600,
@@ -772,15 +856,26 @@ public class AiServiceImpl implements AiService {
             String promptOverride,
             Consumer<Map<String, Object>> eventConsumer
     ) {
+        return streamAnalyzeResume(resumeTitle, modules, promptOverride, eventConsumer, null);
+    }
+
+    @Override
+    public ResumeAnalysisResultDTO streamAnalyzeResume(
+            String resumeTitle,
+            List<ResumeModule> modules,
+            String promptOverride,
+            Consumer<Map<String, Object>> eventConsumer,
+            String language
+    ) {
         validateConfiguration();
 
-        var prompt = buildResumeAnalysisPrompt(resumeTitle, modules, promptOverride);
-        emitStreamEvent(eventConsumer, "status", Map.of("message", "AI 已连接，正在审阅整份简历。"));
+        var prompt = buildResumeAnalysisPrompt(resumeTitle, modules, promptOverride, language);
+        emitStreamEvent(eventConsumer, "status", Map.of("message", isEnglishLanguage(language) ? "AI connected, reviewing the full resume." : "AI 已连接，正在审阅整份简历。"));
 
         try {
             var streamResult = streamChatCompletion(
                     resolveAnalysisModel(),
-                    "你是一位严格、专业、懂技术招聘的资深简历顾问。你需要基于候选人当前简历内容给出真实、克制、可执行的分析结果，并且必须严格输出 JSON。",
+                    isEnglishLanguage(language) ? ANALYSIS_SYSTEM_PROMPT_EN : ANALYSIS_SYSTEM_PROMPT_ZH,
                     prompt,
                     0.3,
                     1600,
@@ -791,7 +886,7 @@ public class AiServiceImpl implements AiService {
 
             var response = streamResult.content();
             if (response == null || response.isBlank()) {
-                throw new BusinessException(ResultCode.AI_RESPONSE_INVALID.getCode(), "AI 思考已结束，但未返回最终分析结果，请重试");
+                throw new BusinessException(ResultCode.AI_RESPONSE_INVALID.getCode(), isEnglishLanguage(language) ? "AI finished thinking but returned no analysis result, please retry" : "AI 思考已结束，但未返回最终分析结果，请重试");
             }
             return parseAnalysisResponse(response);
         } catch (BusinessException e) {
@@ -807,6 +902,16 @@ public class AiServiceImpl implements AiService {
             String resumeTitle,
             List<ResumeModule> modules,
             SmartOnePagePreviewRequestDTO request
+    ) {
+        return previewSmartOnePage(resumeTitle, modules, request, null);
+    }
+
+    @Override
+    public SmartOnePagePreviewResponseDTO previewSmartOnePage(
+            String resumeTitle,
+            List<ResumeModule> modules,
+            SmartOnePagePreviewRequestDTO request,
+            String language
     ) {
         var originalModules = sortResumeModules(modules).stream()
                 .map(this::cloneModule)
@@ -850,7 +955,8 @@ public class AiServiceImpl implements AiService {
                         resumeContext,
                         promptInstruction,
                         templatePreset.getMarkdownBody(),
-                        skillPreset
+                        skillPreset,
+                        language
                 );
                 var optimizedModule = cloneModuleWithContent(module, optimizedContent);
                 optimizedModules.add(optimizedModule);
@@ -1015,7 +1121,8 @@ public class AiServiceImpl implements AiService {
             String resumeContext,
             String promptInstruction,
             String templateMarkdown,
-            SmartOnePagePresetRegistry.SkillPreset skillPreset
+            SmartOnePagePresetRegistry.SkillPreset skillPreset,
+            String language
     ) {
         validateContentLength(module.getContent());
 
@@ -1029,7 +1136,7 @@ public class AiServiceImpl implements AiService {
                 2. 输出必须且只能是与输入结构完全一致的 JSON。
                 3. 如果原文已经足够成熟，也可以只做极少修改。
                 """,
-                buildSmartOnePageModulePrompt(resumeTitle, module, resumeContext, promptInstruction, templateMarkdown, skillPreset),
+                buildSmartOnePageModulePrompt(resumeTitle, module, resumeContext, promptInstruction, templateMarkdown, skillPreset, language),
                 0.35,
                 3200,
                 false,
@@ -1049,13 +1156,14 @@ public class AiServiceImpl implements AiService {
             String resumeContext,
             String promptInstruction,
             String templateMarkdown,
-            SmartOnePagePresetRegistry.SkillPreset skillPreset
+            SmartOnePagePresetRegistry.SkillPreset skillPreset,
+            String language
     ) {
         var moduleRule = defaultModuleRule(module.getModuleType());
         var presetRules = skillPreset == null ? "" : String.join("\n", skillPreset.getModuleRules());
 
         return """
-                请基于整份简历上下文，对其中一个模块进行“智能一页”压缩预处理。
+                请基于整份简历上下文，对其中一个模块进行"智能一页"压缩预处理。
 
                 ## 简历标题
                 %s
@@ -1093,7 +1201,7 @@ public class AiServiceImpl implements AiService {
                 templateMarkdown,
                 promptInstruction,
                 presetRules,
-                MODULE_LABELS.getOrDefault(module.getModuleType(), module.getModuleType()),
+                resolveModuleLabel(module.getModuleType(), language),
                 moduleRule,
                 toPrettyJsonString(module.getContent())
         );
@@ -1737,7 +1845,7 @@ public class AiServiceImpl implements AiService {
 
         value = value.replaceFirst("^[-*\\s]+", "").trim();
 
-        var quotedMatcher = Pattern.compile("[“\\\"]([^\\n”\\\"]{12,})[”\\\"]").matcher(value);
+        var quotedMatcher = Pattern.compile("[\"\u201c\u201d]([^\n\"\u201c\u201d]{12,})[\"\u201c\u201d]").matcher(value);
         if (quotedMatcher.find()) {
             return cleanTextContent(quotedMatcher.group(1));
         }
@@ -2132,15 +2240,69 @@ public class AiServiceImpl implements AiService {
         }
     }
 
-    private String buildResumeAnalysisPrompt(String resumeTitle, List<ResumeModule> modules, String promptOverride) {
+    private String buildResumeAnalysisPrompt(String resumeTitle, List<ResumeModule> modules, String promptOverride, String language) {
         var moduleSummaries = modules.stream()
                 .sorted(Comparator.comparing((ResumeModule module) -> module.getSortOrder() == null ? Integer.MAX_VALUE : module.getSortOrder())
                         .thenComparing(ResumeModule::getId))
-                .map(this::buildModuleSummary)
+                .map(module -> buildModuleSummary(module, language))
                 .toList();
-        var instructions = promptOverride == null || promptOverride.isBlank()
-                ? DEFAULT_ANALYSIS_INSTRUCTIONS
+        var effectiveInstructions = promptOverride == null || promptOverride.isBlank()
+                ? (isEnglishLanguage(language) ? ENGLISH_ANALYSIS_INSTRUCTIONS : DEFAULT_ANALYSIS_INSTRUCTIONS)
                 : promptOverride.trim();
+        var title = resumeTitle == null || resumeTitle.isBlank()
+                ? (isEnglishLanguage(language) ? "Untitled Resume" : "未命名简历")
+                : resumeTitle;
+
+        if (isEnglishLanguage(language)) {
+            return String.join("\n",
+                    "Analyze the following resume and provide a structured assessment.",
+                    "",
+                    "## Resume Title",
+                    title,
+                    "",
+                    "## Resume Modules",
+                    String.join("\n\n", moduleSummaries),
+                    "",
+                    "## User Instructions",
+                    effectiveInstructions,
+                    "",
+                    "## Analysis Requirements",
+                    "1. Analyze based on actual content. Do not fabricate information the candidate did not provide.",
+                    "2. Focus on completeness, content quality, professional expression, role fit, and competitiveness.",
+                    "3. Work experience, internship experience, and project experience are equally important.",
+                    "4. Technical skills may be full-sentence descriptions. Do not require them to be categorized keyword lists.",
+                    "5. Do not flag 'skills not categorized' as an issue.",
+                    "6. Do not flag 'missing personal summary / professional summary / self-evaluation' as an issue.",
+                    "7. For entry-level technical resumes, project/work/internship experience and skills carry the highest weight. Do not significantly lower scores for lack of awards, AI competitions, GPA, or GitHub links.",
+                    "8. Awards, GPA, and GitHub packaging should only serve as minor bonus items, not primary scoring criteria.",
+                    "9. Only output issues when there are genuine, significant problems. Avoid generic feedback.",
+                    "10. Suggestions must be specific and actionable.",
+                    "11. Maximum 4 issues, maximum 4 suggestions. Prioritize the most important items.",
+                    "",
+                    "## Output Format",
+                    "You must output strictly JSON only. Do not output any explanation, headings, or Markdown code blocks.",
+                    "JSON structure:",
+                    "{",
+                    "  \"score\": 0,",
+                    "  \"issues\": [",
+                    "    {",
+                    "      \"type\": \"missing | weak | format | content\",",
+                    "      \"field\": \"module.field\",",
+                    "      \"message\": \"Issue description\",",
+                    "      \"suggestion\": \"Specific actionable suggestion\"",
+                    "    }",
+                    "  ],",
+                    "  \"suggestions\": [\"suggestion1\", \"suggestion2\"]",
+                    "}",
+                    "",
+                    "Scoring guide:",
+                    "- 90-100: Complete, mature, ready for submission",
+                    "- 80-89: Good overall, minor optimization opportunities",
+                    "- 70-79: Usable but has clear gaps",
+                    "- 60-69: Significant issues in information or expression",
+                    "- 0-59: Needs major restructuring"
+            );
+        }
 
         return """
                 请分析下面这份简历，并给出结构化评估结果。
@@ -2159,8 +2321,8 @@ public class AiServiceImpl implements AiService {
                 2. 重点关注完整性、内容质量、表达专业度、岗位匹配度、竞争力。
                 3. 工作经历、实习经历和项目经历都很重要，不要因为名称不同而区别对待。
                 4. 专业技能可能是整句能力描述，不要机械地要求必须是技术名词列表。
-                5. 不要把“专业技能没有分类展示”当成问题，也不要建议按类别重写专业技能。
-                6. 不要把“缺少个人简介/职业总结/自我评价”当成问题，也不要建议补这一项。
+                5. 不要把"专业技能没有分类展示"当成问题，也不要建议按类别重写专业技能。
+                6. 不要把"缺少个人简介/职业总结/自我评价"当成问题，也不要建议补这一项。
                 7. 对校招技术简历，项目经历、工作经历、实习经历、专业技能是核心权重；不要因为获奖较少、没有 AI 竞赛、没有 GPA、GitHub 链接缺少补充说明而明显拉低总分。
                 8. 获奖、GPA、GitHub 包装度只能作为轻微加分项或轻微提示，不应作为主要扣分依据。
                 9. 只有在确实存在明显问题时才输出 issues，避免泛泛而谈。
@@ -2189,17 +2351,17 @@ public class AiServiceImpl implements AiService {
                 - 70-79：基础可用，但还有明显短板
                 - 60-69：信息或表达存在较多问题
                 - 0-59：需要明显重构
-                """.formatted(
-                resumeTitle == null || resumeTitle.isBlank() ? "未命名简历" : resumeTitle,
-                String.join("\n\n", moduleSummaries),
-                instructions
-        );
+                """.formatted(title, String.join("\n\n", moduleSummaries), effectiveInstructions);
     }
 
     private String buildModuleSummary(ResumeModule module) {
+        return buildModuleSummary(module, null);
+    }
+
+    private String buildModuleSummary(ResumeModule module, String language) {
         var builder = new StringBuilder();
         builder.append("### ")
-                .append(MODULE_LABELS.getOrDefault(module.getModuleType(), module.getModuleType()))
+                .append(resolveModuleLabel(module.getModuleType(), language))
                 .append('\n');
 
         appendStructuredContent(builder, module.getContent(), "");

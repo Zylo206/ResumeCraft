@@ -7,5 +7,6 @@ import lombok.Data;
 public class ResumeCreateDTO {
     private String title;
     private String templateId;
+    private String language;
 }
 

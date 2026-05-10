@@ -75,7 +75,7 @@ public class ResumeAnalysisController {
 
         var prompt = request == null ? null : request.getPrompt();
         try {
-            var result = aiService.analyzeResume(resume.getTitle(), modules, prompt);
+            var result = aiService.analyzeResume(resume.getTitle(), modules, prompt, resume.getLanguage());
             resumeAnalysisRecordService.save(buildCompletedRecord(userId, resumeId, prompt, result));
             return Result.success(result);
         } catch (BusinessException e) {
@@ -113,7 +113,8 @@ public class ResumeAnalysisController {
                     "message", "简历分析已开始"
             ));
             var result = aiService.streamAnalyzeResume(resume.getTitle(), modules, prompt, event ->
-                    sendSseEvent(response, String.valueOf(event.getOrDefault("type", "message")), event)
+                    sendSseEvent(response, String.valueOf(event.getOrDefault("type", "message")), event),
+                    resume.getLanguage()
             );
             resumeAnalysisRecordService.save(buildCompletedRecord(userId, resumeId, prompt, result));
             sendSseEvent(response, "result", Map.of(

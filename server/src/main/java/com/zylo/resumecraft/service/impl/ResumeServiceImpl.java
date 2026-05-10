@@ -35,20 +35,11 @@ public class ResumeServiceImpl implements ResumeService {
                 .orderByDesc(Resume::getUpdatedAt)
         );
 
-        return resumes.stream().map(r -> {
-            var vo = new ResumeListVO();
-            vo.setId(r.getId());
-            vo.setTitle(r.getTitle());
-            vo.setTemplateId(r.getTemplateId());
-            vo.setCreatedAt(r.getCreatedAt());
-            vo.setUpdatedAt(r.getUpdatedAt());
-            return vo;
-        }).toList();
+        return resumes.stream().map(this::toListVO).toList();
     }
 
     @Override
     public ResumeListVO create(Long userId, ResumeCreateDTO dto) {
-        // 检查简历数量上限
         var count = resumeMapper.selectCount(
             new LambdaQueryWrapper<Resume>()
                 .eq(Resume::getUserId, userId)
@@ -62,22 +53,25 @@ public class ResumeServiceImpl implements ResumeService {
         resume.setUserId(userId);
         resume.setTitle(dto.getTitle() != null ? dto.getTitle() : "未命名简历");
         resume.setTemplateId(dto.getTemplateId() != null ? dto.getTemplateId() : "default");
+        resume.setLanguage(normalizeLanguage(dto.getLanguage()));
         resume.setStatus(1);
         resumeMapper.insert(resume);
 
-        var vo = new ResumeListVO();
-        vo.setId(resume.getId());
-        vo.setTitle(resume.getTitle());
-        vo.setTemplateId(resume.getTemplateId());
-        vo.setCreatedAt(resume.getCreatedAt());
-        vo.setUpdatedAt(resume.getUpdatedAt());
-        return vo;
+        return toListVO(resume);
     }
 
     @Override
     public ResumeListVO update(Long userId, Long resumeId, ResumeUpdateDTO dto) {
         var resume = getAndVerifyOwnership(resumeId, userId);
-        resume.setTitle(dto.getTitle().trim());
+
+        if (dto.getTitle() != null && !dto.getTitle().trim().isEmpty()) {
+            resume.setTitle(dto.getTitle().trim());
+        }
+
+        if (dto.getLanguage() != null && !dto.getLanguage().trim().isEmpty()) {
+            resume.setLanguage(normalizeLanguage(dto.getLanguage()));
+        }
+
         resumeMapper.updateById(resume);
         return toListVO(resume);
     }
@@ -93,11 +87,16 @@ public class ResumeServiceImpl implements ResumeService {
         return getAndVerifyOwnership(resumeId, userId);
     }
 
+    private String normalizeLanguage(String language) {
+        return "en-US".equals(language) ? "en-US" : "zh-CN";
+    }
+
     private ResumeListVO toListVO(Resume resume) {
         var vo = new ResumeListVO();
         vo.setId(resume.getId());
         vo.setTitle(resume.getTitle());
         vo.setTemplateId(resume.getTemplateId());
+        vo.setLanguage(normalizeLanguage(resume.getLanguage()));
         vo.setCreatedAt(resume.getCreatedAt());
         vo.setUpdatedAt(resume.getUpdatedAt());
         return vo;
@@ -111,4 +110,3 @@ public class ResumeServiceImpl implements ResumeService {
         return resume;
     }
 }
-

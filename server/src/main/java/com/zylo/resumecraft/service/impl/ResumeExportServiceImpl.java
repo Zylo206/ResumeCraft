@@ -74,7 +74,7 @@ public class ResumeExportServiceImpl implements ResumeExportService {
 
             Process process = processBuilder.start();
             try (OutputStream outputStream = process.getOutputStream()) {
-                outputStream.write(buildPayload(modules, request).getBytes(StandardCharsets.UTF_8));
+                outputStream.write(buildPayload(modules, request, resume.getLanguage()).getBytes(StandardCharsets.UTF_8));
             }
 
             boolean finished = process.waitFor(2, TimeUnit.MINUTES);
@@ -106,7 +106,7 @@ public class ResumeExportServiceImpl implements ResumeExportService {
         }
     }
 
-    private String buildPayload(Object modules, ResumeExportRequestDTO request) throws IOException {
+    private String buildPayload(Object modules, ResumeExportRequestDTO request, String language) throws IOException {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("modules", modules);
 
@@ -116,6 +116,7 @@ public class ResumeExportServiceImpl implements ResumeExportService {
         options.put("density", blankToNull(request == null ? null : request.getDensity()));
         options.put("accentPreset", blankToNull(request == null ? null : request.getAccentPreset()));
         options.put("headingStyle", blankToNull(request == null ? null : request.getHeadingStyle()));
+        options.put("language", "en-US".equals(language) ? "en-US" : "zh-CN");
         payload.put("options", options);
 
         return objectMapper.writeValueAsString(payload);

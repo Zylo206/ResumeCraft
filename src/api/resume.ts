@@ -1,10 +1,13 @@
 import client, { type ApiEnvelope } from './client'
 import type { AnalysisResult } from '../types'
 
+export type ResumeLanguage = 'zh-CN' | 'en-US'
+
 export interface ResumeListItem {
   id: number
   title: string
   templateId: string
+  language: ResumeLanguage
   createdAt: string
   updatedAt: string
 }
@@ -289,10 +292,10 @@ export const resumeApi = {
   list: () =>
     client.get<ApiEnvelope<ResumeListItem[]>>('/resumes'),
 
-  create: (data?: { title?: string; templateId?: string }) =>
+  create: (data?: { title?: string; templateId?: string; language?: ResumeLanguage }) =>
     client.post<ApiEnvelope<ResumeListItem>>('/resumes', data || {}),
 
-  update: (id: number, data: { title: string }) =>
+  update: (id: number, data: { title?: string; language?: ResumeLanguage }) =>
     client.put<ApiEnvelope<ResumeListItem>>(`/resumes/${id}`, data),
 
   delete: (id: number) =>

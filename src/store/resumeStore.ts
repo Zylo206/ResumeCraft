@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { resumeApi, type ResumeListItem, type ResumeModule } from '../api/resume'
+import { resumeApi, type ResumeListItem, type ResumeModule, type ResumeLanguage } from '../api/resume'
 import type { ImportedResumeData } from '../utils/importers'
 
 function getSortTime(value: string): number {
@@ -34,9 +34,10 @@ interface ResumeState {
   modules: ResumeModule[]
   loading: boolean
   fetchResumeList: () => Promise<void>
-  createResume: (title?: string) => Promise<ResumeListItem>
+  createResume: (title?: string, language?: ResumeLanguage) => Promise<ResumeListItem>
   importResume: (payload: ImportedResumeData) => Promise<ResumeListItem>
   renameResume: (id: number, title: string) => Promise<ResumeListItem>
+  updateResumeLanguage: (id: number, language: ResumeLanguage) => Promise<ResumeListItem>
   deleteResume: (id: number) => Promise<void>
   fetchModules: (resumeId: number) => Promise<void>
   updateModuleContent: (resumeId: number, moduleId: number, content: Record<string, unknown>) => Promise<void>
@@ -62,8 +63,8 @@ export const useResumeStore = create<ResumeState>((set) => ({
     }
   },
 
-  createResume: async (title) => {
-    const { data: res } = await resumeApi.create({ title })
+  createResume: async (title, language) => {
+    const { data: res } = await resumeApi.create({ title, language })
     const newResume = res.data
     set((state) => ({ resumeList: sortResumeList([newResume, ...state.resumeList]) }))
     return newResume
@@ -87,6 +88,17 @@ export const useResumeStore = create<ResumeState>((set) => ({
 
   renameResume: async (id, title) => {
     const { data: res } = await resumeApi.update(id, { title })
+    const updatedResume = res.data
+    set((state) => ({
+      resumeList: state.resumeList.map((resume) =>
+        resume.id === id ? updatedResume : resume
+      ),
+    }))
+    return updatedResume
+  },
+
+  updateResumeLanguage: async (id, language) => {
+    const { data: res } = await resumeApi.update(id, { language })
     const updatedResume = res.data
     set((state) => ({
       resumeList: state.resumeList.map((resume) =>

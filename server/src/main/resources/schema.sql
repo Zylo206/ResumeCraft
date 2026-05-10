@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS `resume` (
     `user_id`     BIGINT       NOT NULL COMMENT '所属用户 ID',
     `title`       VARCHAR(128) NOT NULL DEFAULT '未命名简历' COMMENT '简历标题',
     `template_id` VARCHAR(64)  DEFAULT 'default' COMMENT '模板标识',
+    `language`    VARCHAR(20)  NOT NULL DEFAULT 'zh-CN' COMMENT '简历语言: zh-CN/en-US',
     `status`      TINYINT      NOT NULL DEFAULT 1 COMMENT '状态: 0=已删除, 1=正常',
     `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -47,6 +48,9 @@ CREATE TABLE IF NOT EXISTS `resume` (
     KEY `idx_user_id` (`user_id`),
     KEY `idx_updated_at` (`updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='简历表';
+
+-- 兼容旧库：补 language 列
+ALTER TABLE `resume` ADD COLUMN IF NOT EXISTS `language` VARCHAR(20) NOT NULL DEFAULT 'zh-CN' COMMENT '简历语言: zh-CN/en-US';
 
 -- 简历模块表
 CREATE TABLE IF NOT EXISTS `resume_module` (

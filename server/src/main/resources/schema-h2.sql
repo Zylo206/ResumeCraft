@@ -38,11 +38,15 @@ CREATE TABLE IF NOT EXISTS `resume` (
     `user_id` BIGINT NOT NULL,
     `title` VARCHAR(128) NOT NULL DEFAULT '未命名简历',
     `template_id` VARCHAR(64) DEFAULT 'default',
+    `language` VARCHAR(20) NOT NULL DEFAULT 'zh-CN',
     `status` TINYINT NOT NULL DEFAULT 1,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`)
 );
+
+-- 兼容旧库：补 language 列
+ALTER TABLE `resume` ADD COLUMN IF NOT EXISTS `language` VARCHAR(20) NOT NULL DEFAULT 'zh-CN';
 
 CREATE INDEX IF NOT EXISTS `idx_resume_user_id` ON `resume` (`user_id`);
 CREATE INDEX IF NOT EXISTS `idx_resume_updated_at` ON `resume` (`updated_at`);

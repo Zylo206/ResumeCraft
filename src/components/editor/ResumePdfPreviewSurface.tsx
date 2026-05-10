@@ -45,7 +45,9 @@ export function ResumePdfPreviewSurface({
   headingStyle,
   refreshToken = '',
 }: ResumePdfPreviewSurfaceProps) {
-  const { modules, loading, fetchModules } = useResumeStore()
+  const { modules, loading, fetchModules, resumeList } = useResumeStore()
+  const currentResume = resumeList.find((resume) => resume.id === resumeId)
+  const resumeLanguage = currentResume?.language === 'en-US' ? 'en-US' : 'zh-CN'
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null)
   const [previewMeta, setPreviewMeta] = useState<ResumePdfPreviewMeta | null>(null)
   const [pdfLoading, setPdfLoading] = useState(false)
@@ -75,7 +77,7 @@ export function ResumePdfPreviewSurface({
     setPdfLoading(true)
     setPdfError('')
 
-    void generateResumePdfPreviewAsset(modules, { pageMode, templateId, density, accentPreset, headingStyle })
+    void generateResumePdfPreviewAsset(modules, { pageMode, templateId, density, accentPreset, headingStyle, language: resumeLanguage })
       .then(({ blob, previewMeta: nextPreviewMeta }) => {
         if (cancelled || requestId !== requestIdRef.current) {
           return
@@ -99,7 +101,7 @@ export function ResumePdfPreviewSurface({
     return () => {
       cancelled = true
     }
-  }, [accentPreset, density, headingStyle, modules, pageMode, refreshToken, templateId])
+  }, [accentPreset, density, headingStyle, modules, pageMode, refreshToken, resumeLanguage, templateId])
 
   useEffect(() => {
     const element = containerRef.current
@@ -239,17 +241,35 @@ export function ResumePdfPreviewSurface({
           {rendering ? '正在渲染模板预览...' : '正在生成模板预览...'}
         </div>
       ) : (
-        <div className={pageMode === 'standard' ? 'space-y-6' : ''}>
-          {renderedPages.map((page) => (
-            <figure key={page.pageNumber} className="mx-auto bg-white">
-              <img
-                src={page.dataUrl}
-                alt={`${previewTitle} 第 ${page.pageNumber} 页`}
-                width={Math.round(page.width)}
-                height={Math.round(page.height)}
-                className="block h-auto w-full"
-              />
-            </figure>
+        <div>
+          {renderedPages.map((page, index) => (
+            <div key={page.pageNumber}>
+              {pageMode === 'standard' && index > 0 && renderedPages.length > 1 && (
+                <div className="my-6 flex items-center gap-3 text-xs text-slate-400">
+                  <div className="h-px flex-1 border-t border-dashed border-slate-300" />
+                  <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-slate-500">
+                    第 {page.pageNumber - 1} 页结束 / 第 {page.pageNumber} 页开始
+                  </span>
+                  <div className="h-px flex-1 border-t border-dashed border-slate-300" />
+                </div>
+              )}
+
+              <figure className="relative mx-auto overflow-hidden bg-white shadow-sm ring-1 ring-slate-200">
+                {pageMode === 'standard' && (
+                  <div className="absolute right-3 top-3 z-10 rounded-full bg-white/90 px-2.5 py-1 text-xs text-slate-500 shadow-sm ring-1 ring-slate-200">
+                    第 {page.pageNumber} 页
+                  </div>
+                )}
+
+                <img
+                  src={page.dataUrl}
+                  alt={`${previewTitle} 第 ${page.pageNumber} 页`}
+                  width={Math.round(page.width)}
+                  height={Math.round(page.height)}
+                  className="block h-auto w-full"
+                />
+              </figure>
+            </div>
           ))}
         </div>
       )}

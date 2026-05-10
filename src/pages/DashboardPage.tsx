@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { ResumeListItem } from '../api/resume'
+import type { ResumeListItem, ResumeLanguage } from '../api/resume'
 import { useResumeStore } from '../store/resumeStore'
 import { Header } from '../components/layout/Header'
 import { ResumeCard } from '../components/dashboard/ResumeCard'
@@ -8,11 +8,12 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
-  const { resumeList, loading, fetchResumeList, createResume, renameResume, deleteResume } = useResumeStore()
+  const { resumeList, loading, fetchResumeList, createResume, renameResume, deleteResume, updateResumeLanguage } = useResumeStore()
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
   const [dialogMode, setDialogMode] = useState<'create' | 'rename' | null>(null)
   const [resumeTitle, setResumeTitle] = useState('')
+  const [resumeLanguage, setResumeLanguage] = useState<ResumeLanguage>('zh-CN')
   const [editingResume, setEditingResume] = useState<ResumeListItem | null>(null)
   const [deletingResume, setDeletingResume] = useState<ResumeListItem | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -30,10 +31,11 @@ export default function DashboardPage() {
       if (dialogMode === 'rename' && editingResume) {
         await renameResume(editingResume.id, title)
       } else {
-        const resume = await createResume(title || undefined)
+        const resume = await createResume(title || undefined, resumeLanguage)
         nextResumeId = resume.id
       }
       setResumeTitle('')
+      setResumeLanguage('zh-CN')
       setEditingResume(null)
       setDialogMode(null)
       if (nextResumeId) {
@@ -54,6 +56,7 @@ export default function DashboardPage() {
   const openCreateDialog = () => {
     setError('')
     setResumeTitle('')
+    setResumeLanguage('zh-CN')
     setEditingResume(null)
     setDialogMode('create')
   }
@@ -69,6 +72,7 @@ export default function DashboardPage() {
     if (creating) return
     setDialogMode(null)
     setResumeTitle('')
+    setResumeLanguage('zh-CN')
     setEditingResume(null)
   }
 
@@ -90,6 +94,11 @@ export default function DashboardPage() {
     } finally {
       setDeleting(false)
     }
+  }
+
+  const handleToggleLanguage = async (resume: ResumeListItem) => {
+    const nextLanguage = resume.language === 'en-US' ? 'zh-CN' : 'en-US'
+    await updateResumeLanguage(resume.id, nextLanguage)
   }
 
   return (
@@ -137,6 +146,7 @@ export default function DashboardPage() {
                 resume={resume}
                 onDelete={handleDelete}
                 onRename={openRenameDialog}
+                onToggleLanguage={handleToggleLanguage}
               />
             ))}
           </div>
@@ -189,6 +199,38 @@ export default function DashboardPage() {
                 autoFocus
               />
             </div>
+
+            {dialogMode === 'create' && (
+              <div className="mt-4">
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  简历语言
+                </label>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setResumeLanguage('zh-CN')}
+                    className={`flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors ${
+                      resumeLanguage === 'zh-CN'
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-gray-300 text-gray-600 hover:border-gray-400'
+                    }`}
+                  >
+                    中文简历
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setResumeLanguage('en-US')}
+                    className={`flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors ${
+                      resumeLanguage === 'en-US'
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-gray-300 text-gray-600 hover:border-gray-400'
+                    }`}
+                  >
+                    English Resume
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="mt-6 flex justify-end gap-3">
               <button
