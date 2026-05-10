@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as PDFJS from 'pdfjs-dist'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { AnimatePresence, motion, useReducedMotion, type Variants } from 'framer-motion'
-import type { ResumeModule } from '../../api/resume'
+import type { ResumeModule, ResumeLanguage } from '../../api/resume'
 import type { ModuleType } from '../../types'
 import {
   normalizeAwardContent,
@@ -16,7 +16,14 @@ import {
 } from '../../utils/moduleContent'
 import { parseInlineMarkdownSegments } from '../../utils/inlineMarkdown'
 import { normalizePhotoSource } from '../../utils/resumePhoto'
-import { findBasicInfoContent, getModuleDisplayLabel } from '../../utils/resumeDisplay'
+import {
+  findBasicInfoContent,
+  getModuleDisplayLabel,
+  formatMonthRange,
+  formatAwardDisplayTime,
+  getUILabel,
+  normalizeResumeLanguage,
+} from '../../utils/resumeDisplay'
 import {
   generateResumePdfBlob,
   type ResumePdfAccentPreset,
@@ -37,6 +44,7 @@ interface PreviewPanelProps {
     accentPreset: ResumePdfAccentPreset
     headingStyle: ResumePdfHeadingStyle
   }
+  language?: ResumeLanguage
 }
 
 type PreviewMode = 'live' | 'pdf-standard' | 'pdf-continuous'
@@ -119,7 +127,8 @@ function usePdfPreview(
   modules: ResumeModule[],
   pageMode: ResumePdfPageMode,
   enabled: boolean,
-  pdfConfig?: PreviewPanelProps['pdfConfig']
+  pdfConfig?: PreviewPanelProps['pdfConfig'],
+  isEn?: boolean,
 ): PdfPreviewState {
   const [blob, setBlob] = useState<Blob | null>(null)
   const [loading, setLoading] = useState(false)
@@ -183,7 +192,7 @@ function usePdfPreview(
         }
 
         setLoading(false)
-        setError(reason instanceof Error ? reason.message : 'PDF 预览生成失败，请稍后重试')
+        setError(reason instanceof Error ? reason.message : (isEn ? 'PDF preview generation failed' : 'PDF 预览生成失败，请稍后重试'))
       })
 
     return () => {
@@ -200,10 +209,12 @@ export function PreviewPanel({
   forcedMode,
   hideHeader = false,
   pdfConfig,
+  language,
 }: PreviewPanelProps) {
   const shouldReduceMotion = useReducedMotion() ?? false
   const [previewMode, setPreviewMode] = useState<PreviewMode>(forcedMode ?? 'live')
   const isCompactDensity = pdfConfig?.density === 'compact'
+  const isEn = normalizeResumeLanguage(language) === 'en-US'
   const sortedModules = [...modules].sort((a, b) => {
     if (a.sortOrder === b.sortOrder) {
       return a.id - b.id
@@ -238,10 +249,10 @@ export function PreviewPanel({
 
     return !(module.moduleType === 'award' && hasEducationModule)
   })
-  const standardPdfPreview = usePdfPreview(modules, 'standard', previewMode === 'pdf-standard', pdfConfig)
+  const standardPdfPreview = usePdfPreview(modules, 'standard', previewMode === 'pdf-standard', pdfConfig, isEn)
   const activePdfPreview = standardPdfPreview
-  const activePdfTitle = 'PDF预览'
-  const activePdfDescription = '当前模板和样式参数下的标准 A4 分页预览。'
+  const activePdfTitle = isEn ? 'PDF Preview' : 'PDF预览'
+  const activePdfDescription = isEn ? 'Standard A4 paginated preview with current template and style settings.' : '当前模板和样式参数下的标准 A4 分页预览。'
   const activePdfIframeTitle = 'Resume Standard PDF Preview'
 
   useEffect(() => {
@@ -253,7 +264,7 @@ export function PreviewPanel({
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center bg-white text-gray-300">
-        加载中...
+        {isEn ? 'Loading...' : '加载中...'}
       </div>
     )
   }
@@ -264,7 +275,7 @@ export function PreviewPanel({
         <svg className="w-16 h-16 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
-        <p>暂无模块，请在左侧添加</p>
+        <p>{isEn ? 'No modules yet. Add from the left sidebar.' : '暂无模块，请在左侧添加'}</p>
       </div>
     )
   }
@@ -276,11 +287,11 @@ export function PreviewPanel({
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">
-                {previewMode === 'live' ? '文本预览' : activePdfTitle}
+                {previewMode === 'live' ? (isEn ? 'Text Preview' : '文本预览') : activePdfTitle}
               </h2>
               {previewMode === 'live' ? (
                 <p className="mt-1 text-xs text-gray-500">
-                  当前展示的是编辑内容的文本预览效果。
+                  {isEn ? 'Text preview of the current editor content.' : '当前展示的是编辑内容的文本预览效果。'}
                 </p>
               ) : (
                 <p className="mt-1 text-xs text-gray-500">
@@ -298,7 +309,7 @@ export function PreviewPanel({
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                文本预览
+                {isEn ? 'Text' : '文本预览'}
               </button>
               <button
                 type="button"
@@ -309,7 +320,7 @@ export function PreviewPanel({
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                PDF预览
+                PDF
               </button>
             </div>
           </div>
@@ -319,6 +330,7 @@ export function PreviewPanel({
           <PdfPreviewCard
             preview={activePdfPreview}
             iframeTitle={activePdfIframeTitle}
+            isEn={isEn}
           />
         ) : (
           <motion.div
@@ -345,6 +357,7 @@ export function PreviewPanel({
                   basicInfoContent={basicInfoContent}
                   compactEducation={isCompactDensity}
                   shouldReduceMotion={shouldReduceMotion}
+                  language={language}
                 />
                 ))}
               </AnimatePresence>
@@ -359,9 +372,11 @@ export function PreviewPanel({
 function PdfPreviewCard({
   preview,
   iframeTitle,
+  isEn,
 }: {
   preview: PdfPreviewState
   iframeTitle: string
+  isEn?: boolean
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [containerWidth, setContainerWidth] = useState(0)
@@ -420,7 +435,7 @@ function PdfPreviewCard({
           const canvas = document.createElement('canvas')
           const context = canvas.getContext('2d')
           if (!context) {
-            throw new Error('PDF 预览上下文创建失败')
+            throw new Error(isEn ? 'Failed to create PDF preview context' : 'PDF 预览上下文创建失败')
           }
 
           canvas.width = Math.floor(viewport.width * outputScale)
@@ -455,7 +470,7 @@ function PdfPreviewCard({
 
         setPages([])
         setRendering(false)
-        setRenderError(error instanceof Error ? error.message : 'PDF 预览渲染失败')
+        setRenderError(error instanceof Error ? error.message : (isEn ? 'PDF preview rendering failed' : 'PDF 预览渲染失败'))
       }
     })()
 
@@ -481,7 +496,7 @@ function PdfPreviewCard({
                 <figure className="mx-auto overflow-hidden bg-white shadow-[0_24px_60px_-42px_rgba(15,23,42,0.32)]">
                   <img
                     src={page.dataUrl}
-                    alt={`${iframeTitle} 第 ${page.pageNumber} 页`}
+                    alt={`${iframeTitle} ${isEn ? 'Page' : '第'} ${page.pageNumber} ${isEn ? '' : '页'}`}
                     width={Math.round(page.width)}
                     height={Math.round(page.height)}
                     className="block w-full h-auto"
@@ -489,7 +504,7 @@ function PdfPreviewCard({
                 </figure>
                 {pages.length > 1 ? (
                   <span className="pointer-events-none absolute right-3 top-3 rounded bg-white/88 px-2 py-1 text-[10px] font-medium tracking-wide text-slate-400 shadow-sm">
-                    第 {page.pageNumber} 页
+                    {isEn ? 'Page' : '第'} {page.pageNumber} {isEn ? '' : '页'}
                   </span>
                 ) : null}
               </div>
@@ -497,46 +512,26 @@ function PdfPreviewCard({
           </div>
           {(preview.loading || rendering) ? (
             <span className="pointer-events-none absolute right-3 top-3 rounded-full bg-white/92 px-2.5 py-1 text-[11px] font-medium text-gray-500 shadow-sm ring-1 ring-gray-200">
-              {rendering ? '渲染中...' : '更新中...'}
+              {rendering ? (isEn ? 'Rendering...' : '渲染中...') : (isEn ? 'Updating...' : '更新中...')}
             </span>
           ) : null}
         </div>
       ) : (
         <div className="flex h-[70vh] min-h-[520px] items-center justify-center text-sm text-gray-400">
-          正在准备 PDF 预览...
+          {isEn ? 'Preparing PDF preview...' : '正在准备 PDF 预览...'}
         </div>
       )}
     </section>
   )
 }
 
-function renderLabeledText(label: string, value: string, emphasize = false) {
+function renderLabeledText(label: string, value: string, emphasize = false, sep = '：') {
   return (
     <>
-      <span className="text-gray-500">{label}：</span>
+      <span className="text-gray-500">{label}{sep}</span>
       <span className={emphasize ? 'font-semibold text-gray-900' : 'text-gray-700'}>{value}</span>
     </>
   )
-}
-
-function formatMonth(value: string) {
-  if (!value) return ''
-  const [year, month] = value.split('-')
-  if (!year || !month) return value
-  return `${year}年-${Number(month)}月`
-}
-
-function formatMonthRange(start: string, end: string) {
-  const startText = formatMonth(start)
-  const endText = formatMonth(end)
-  if (startText && endText) return `${startText}至${endText}`
-  return startText || endText
-}
-
-function formatAwardDisplayTime(value: string) {
-  if (!value) return ''
-  const [year] = value.split('-')
-  return year ? `${year}年` : value
 }
 
 function normalizeExternalUrl(value: string) {
@@ -544,13 +539,13 @@ function normalizeExternalUrl(value: string) {
   return /^https?:\/\//i.test(value) ? value : `https://${value}`
 }
 
-function renderContactItem(label: string, value: string) {
-  const isLink = label === 'GitHub' || label === '博客'
+function renderContactItem(label: string, value: string, sep = '：') {
+  const isLink = label === 'GitHub' || label === 'Blog'
   const normalizedUrl = isLink ? normalizeExternalUrl(value) : ''
 
   return (
     <span key={label}>
-      <span className="text-gray-500">{label}：</span>
+      <span className="text-gray-500">{label}{sep}</span>
       {isLink ? (
         <a
           href={normalizedUrl}
@@ -606,6 +601,7 @@ function ModulePreviewSection({
   basicInfoContent,
   compactEducation,
   shouldReduceMotion,
+  language,
 }: {
   module: ResumeModule
   modules: ResumeModule[]
@@ -615,8 +611,12 @@ function ModulePreviewSection({
   basicInfoContent: ReturnType<typeof findBasicInfoContent>
   compactEducation: boolean
   shouldReduceMotion: boolean
+  language?: ResumeLanguage
 }) {
-  const label = getModuleDisplayLabel(module.moduleType as ModuleType, basicInfoContent)
+  const lang = normalizeResumeLanguage(language)
+  const isEn = lang === 'en-US'
+  const sep = isEn ? ': ' : '：'
+  const label = getModuleDisplayLabel(module.moduleType as ModuleType, basicInfoContent, language)
   const awardModules = modules.filter((item) => item.moduleType === 'award')
   const surfaceTone = getModuleSurfaceTone(module.moduleType, index)
 
@@ -627,23 +627,23 @@ function ModulePreviewSection({
     return (
       <div key={projectModule.id} className="mb-4 space-y-1.5 last:mb-0">
         <div className="flex justify-between items-start">
-          <div className="font-semibold text-gray-800">{titleLine || '项目 - 角色'}</div>
+          <div className="font-semibold text-gray-800">{titleLine || (isEn ? 'Project - Role' : '项目 - 角色')}</div>
           <span className="text-sm text-gray-400">
-            {formatMonthRange(content.startDate, content.endDate)}
+            {formatMonthRange(content.startDate, content.endDate, language)}
           </span>
         </div>
         {content.description && (
           <p className="text-sm text-gray-600">
-            <span className="text-gray-500">项目简介：</span>
+            <span className="text-gray-500">{getUILabel('projectSummary', language)}{sep}</span>
             {content.description}
           </p>
         )}
         {content.techStack && (
-          <p className="text-sm text-gray-500">技术栈：{content.techStack}</p>
+          <p className="text-sm text-gray-500">{getUILabel('techStack', language)}{sep}{content.techStack}</p>
         )}
         {content.achievements.length > 0 && (
           <div className="text-sm text-gray-600">
-            <p className="text-gray-500">核心职责：</p>
+            <p className="text-gray-500">{getUILabel('coreDuties', language)}{sep}</p>
             <div className="mt-1 space-y-1 pl-4">
               {content.achievements.map((a, i) => (
                 <div key={`${i}-${a}`} className="flex gap-2">
@@ -664,23 +664,23 @@ function ModulePreviewSection({
     return (
       <div key={internshipModule.id} className="mb-4 space-y-1.5 last:mb-0">
         <div className="flex justify-between items-start">
-          <div className="font-semibold text-gray-800">{titleLine || '公司 - 职位 - 项目名'}</div>
+          <div className="font-semibold text-gray-800">{titleLine || (isEn ? 'Company - Position - Project' : '公司 - 职位 - 项目名')}</div>
           <span className="text-sm text-gray-400">
-            {formatMonthRange(content.startDate, content.endDate)}
+            {formatMonthRange(content.startDate, content.endDate, language)}
           </span>
         </div>
         {content.projectDescription && (
           <p className="text-sm text-gray-600">
-            <span className="text-gray-500">项目简介：</span>
+            <span className="text-gray-500">{getUILabel('projectSummary', language)}{sep}</span>
             {content.projectDescription}
           </p>
         )}
         {content.techStack && (
-          <p className="text-sm text-gray-500">技术栈：{content.techStack}</p>
+          <p className="text-sm text-gray-500">{getUILabel('techStack', language)}{sep}{content.techStack}</p>
         )}
         {content.responsibilities.length > 0 && (
           <div className="text-sm text-gray-600">
-            <p className="text-gray-500">核心职责：</p>
+            <p className="text-gray-500">{getUILabel('coreDuties', language)}{sep}</p>
             <div className="mt-1 space-y-1 pl-4">
               {content.responsibilities.map((line, index) => (
                 <div key={`${index}-${line}`} className="flex gap-2">
@@ -704,16 +704,16 @@ function ModulePreviewSection({
           ? 'border border-primary-100 bg-slate-50'
           : 'bg-slate-50'
         const contactItems = [
-          ['邮箱', content.email as string],
-          ['手机号', content.phone as string],
-          ['微信', content.wechat as string],
-          ['意向城市', content.targetCity as string],
-          ['期望薪资', content.salaryRange as string],
-          ['到岗时间', content.expectedEntryDate as string],
+          [getUILabel('email', language), content.email as string],
+          [getUILabel('phone', language), content.phone as string],
+          [isEn ? 'WeChat' : '微信', content.wechat as string],
+          [isEn ? 'Target City' : '意向城市', content.targetCity as string],
+          [isEn ? 'Expected Salary' : '期望薪资', content.salaryRange as string],
+          [isEn ? 'Available Date' : '到岗时间', content.expectedEntryDate as string],
           ['GitHub', content.github as string],
-          ['博客', content.blog as string],
-          ['籍贯', content.hometown as string],
-          ['工作年限', content.workYears as string],
+          [isEn ? 'Blog' : '博客', content.blog as string],
+          [isEn ? 'Hometown' : '籍贯', content.hometown as string],
+          [isEn ? 'Work Years' : '工作年限', content.workYears as string],
           ['LeetCode', content.leetcode as string],
         ].filter(([, value]) => value)
 
@@ -722,17 +722,17 @@ function ModulePreviewSection({
             <div className={photoSource ? 'grid grid-cols-[minmax(0,1fr)_108px] gap-5 items-start' : 'space-y-3'}>
               <div className="min-w-0 space-y-3">
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-[15px]">
-                  <p>{renderLabeledText('姓名', (content.name as string) || '未填写', true)}</p>
-                  {content.jobIntention && <p>{renderLabeledText('求职意向', content.jobIntention as string)}</p>}
+                  <p>{renderLabeledText(getUILabel('name', language), (content.name as string) || (isEn ? 'Not filled' : '未填写'), true, sep)}</p>
+                  {content.jobIntention && <p>{renderLabeledText(getUILabel('objective', language), content.jobIntention as string, false, sep)}</p>}
                 </div>
                 <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-gray-600">
                   {contactItems.map(([itemLabel, itemValue]) => (
-                    renderContactItem(itemLabel as string, itemValue as string)
+                    renderContactItem(itemLabel as string, itemValue as string, sep)
                   ))}
                 </div>
                 {content.summary && (
                   <p className="text-sm text-gray-600 whitespace-pre-wrap">
-                    <span className="text-gray-500">个人总结：</span>
+                    <span className="text-gray-500">{isEn ? 'Summary' : '个人总结'}{sep}</span>
                     {content.summary}
                   </p>
                 )}
@@ -740,7 +740,7 @@ function ModulePreviewSection({
               {photoSource ? (
                 <div className="flex justify-end">
                   <div className={`aspect-[3/4] w-[108px] overflow-hidden shadow-[0_10px_25px_-18px_rgba(15,23,42,0.4)] ${photoFrameClassName}`}>
-                    <img src={photoSource} alt="简历照片" className="h-full w-full object-cover" />
+                    <img src={photoSource} alt={isEn ? 'Resume photo' : '简历照片'} className="h-full w-full object-cover" />
                   </div>
                 </div>
               ) : null}
@@ -762,7 +762,7 @@ function ModulePreviewSection({
                 const schoolTags = [
                   content.is985 ? '985' : '',
                   content.is211 ? '211' : '',
-                  content.isDoubleFirst ? '双一流' : '',
+                  content.isDoubleFirst ? (isEn ? 'Double First-Class' : '双一流') : '',
                 ].filter(Boolean)
                 const departmentMajor = [
                   content.department ? `${content.department}` : '',
@@ -770,11 +770,11 @@ function ModulePreviewSection({
                 ].join('')
                 const firstRowItems = [
                   content.degree || '',
-                  formatMonthRange(content.startDate as string, content.endDate as string),
+                  formatMonthRange(content.startDate as string, content.endDate as string, language),
                 ].filter(Boolean)
                 const secondRowItems = [
-                  content.department ? `院系：${content.department}` : '',
-                  content.major ? `专业：${content.major}` : '',
+                  content.department ? `${isEn ? 'Dept' : '院系'}${sep}${content.department}` : '',
+                  content.major ? `${isEn ? 'Major' : '专业'}${sep}${content.major}` : '',
                 ].filter(Boolean)
 
                 return (
@@ -786,7 +786,7 @@ function ModulePreviewSection({
                       <div className="flex items-start justify-between gap-4 text-sm text-gray-700">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-semibold text-gray-900">
-                            {(content.school as string) || '未填写'}
+                            {(content.school as string) || (isEn ? 'Not filled' : '未填写')}
                             {departmentMajor ? <span className="ml-2 font-normal text-gray-600">{departmentMajor}</span> : null}
                           </span>
                           {schoolTags.map((tag) => (
@@ -805,7 +805,7 @@ function ModulePreviewSection({
                       <>
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
-                            <span className="font-semibold text-gray-900">{(content.school as string) || '未填写'}</span>
+                            <span className="font-semibold text-gray-900">{(content.school as string) || (isEn ? 'Not filled' : '未填写')}</span>
                             {schoolTags.map((tag) => (
                               <span key={tag} className="rounded bg-primary-50 px-1.5 py-0.5 text-xs text-primary-600">
                                 {tag}
@@ -836,9 +836,9 @@ function ModulePreviewSection({
               <div className="space-y-1 pt-1">
                 {awards.map((award, index) => (
                   <div key={`${award.awardName}-${index}`} className="text-sm text-gray-600">
-                    <span className="text-gray-500">奖项：</span>
+                    <span className="text-gray-500">{getUILabel('awardName', language)}{sep}</span>
                     {award.awardName}
-                    {award.awardTime ? `（${formatAwardDisplayTime(award.awardTime)}）` : ''}
+                    {award.awardTime ? `（${formatAwardDisplayTime(award.awardTime, language)}）` : ''}
                   </div>
                 ))}
               </div>
@@ -855,23 +855,23 @@ function ModulePreviewSection({
         return (
           <div className="mb-4 space-y-1.5">
             <div className="flex justify-between items-start">
-              <div className="font-semibold text-gray-800">{titleLine || '公司 - 职位 - 项目名'}</div>
+              <div className="font-semibold text-gray-800">{titleLine || (isEn ? 'Company - Position - Project' : '公司 - 职位 - 项目名')}</div>
               <span className="text-sm text-gray-400">
-                {formatMonthRange(content.startDate, content.endDate)}
+                {formatMonthRange(content.startDate, content.endDate, language)}
               </span>
             </div>
             {content.projectDescription && (
               <p className="text-sm text-gray-600">
-                <span className="text-gray-500">项目简介：</span>
+                <span className="text-gray-500">{getUILabel('projectSummary', language)}{sep}</span>
                 {content.projectDescription}
               </p>
             )}
             {content.techStack && (
-              <p className="text-sm text-gray-500">技术栈：{content.techStack}</p>
+              <p className="text-sm text-gray-500">{getUILabel('techStack', language)}{sep}{content.techStack}</p>
             )}
             {content.responsibilities.length > 0 && (
               <div className="text-sm text-gray-600">
-                <p className="text-gray-500">核心职责：</p>
+                <p className="text-gray-500">{getUILabel('coreDuties', language)}{sep}</p>
                 <div className="mt-1 space-y-1 pl-4">
                   {content.responsibilities.map((line, index) => (
                     <div key={`${index}-${line}`} className="flex gap-2">
@@ -933,7 +933,7 @@ function ModulePreviewSection({
         return (
           <div className="mb-3">
             <p>
-              <span className="font-semibold">{content.journalName || '论文'}</span>
+              <span className="font-semibold">{content.journalName || (isEn ? 'Paper' : '论文')}</span>
               {content.journalType && <span className="text-gray-500 ml-2">({content.journalType})</span>}
               {content.publishTime && <span className="text-gray-400 ml-2">{content.publishTime}</span>}
             </p>
@@ -945,11 +945,11 @@ function ModulePreviewSection({
         const content = normalizeResearchContent(module.content)
         return (
           <div className="mb-4">
-            <p className="font-semibold">{content.projectName || '科研项目'}</p>
-            {content.projectCycle && <p className="text-sm text-gray-400">周期: {content.projectCycle}</p>}
-            {content.background && <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">背景: {content.background}</p>}
-            {content.workContent && <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">工作: {content.workContent}</p>}
-            {content.achievements && <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">成果: {content.achievements}</p>}
+            <p className="font-semibold">{content.projectName || (isEn ? 'Research Project' : '科研项目')}</p>
+            {content.projectCycle && <p className="text-sm text-gray-400">{isEn ? 'Duration' : '周期'}: {content.projectCycle}</p>}
+            {content.background && <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{isEn ? 'Background' : '背景'}: {content.background}</p>}
+            {content.workContent && <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{isEn ? 'Work' : '工作'}: {content.workContent}</p>}
+            {content.achievements && <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{isEn ? 'Achievements' : '成果'}: {content.achievements}</p>}
           </div>
         )
       }
@@ -957,8 +957,8 @@ function ModulePreviewSection({
         const content = normalizeAwardContent(module.content)
         return (
           <div className="mb-2 text-sm text-gray-600">
-            {content.awardName || '奖项'}
-            {content.awardTime ? `（${formatAwardDisplayTime(content.awardTime)}）` : ''}
+            {content.awardName || (isEn ? 'Award' : '奖项')}
+            {content.awardTime ? `（${formatAwardDisplayTime(content.awardTime, language)}）` : ''}
           </div>
         )
       }

@@ -129,6 +129,56 @@ public class AiServiceImpl implements AiService {
     private static final String ANALYSIS_SYSTEM_PROMPT_ZH = "你是一位严格、专业、懂技术招聘的资深简历顾问。你需要基于候选人当前简历内容给出真实、克制、可执行的分析结果，并且必须严格输出 JSON。";
     private static final String ANALYSIS_SYSTEM_PROMPT_EN = "You are a strict, professional, senior resume consultant with technical recruiting expertise. You must provide real, restrained, actionable analysis based on the candidate's current resume content, and must strictly output JSON.";
 
+    private static final String EN_FIELD_SYSTEM_PROMPT = """
+            You are a senior technical resume optimization expert specializing in software engineering roles.
+
+            Your principles:
+            1. Maximize information density.
+            2. Structure: tech stack first, then what the system does, then core capability/mechanism, then value or outcome.
+            3. Prefer one long, dense sentence over two short ones.
+            4. Never use meta-descriptions like "Version 1", "Option A", "Below is".
+            5. Add spaces around English keywords; no space before punctuation.
+            """;
+    private static final String EN_DESCRIPTION_PROMPT = """
+            Optimize the following project description for a technical resume.
+
+            Requirements:
+            - Use strong action verbs (Designed, Developed, Implemented, Optimized, Built, Led).
+            - Lead with the tech stack, then what the system does, then core mechanism, then measurable outcome.
+            - Preserve all factual information. Do not invent metrics or experience.
+            - Output 3 distinct versions as JSON: {"candidates":["versionA","versionB","versionC"]}
+            - Version A: close to original, language tightened only.
+            - Version B: standard - add relevant tech context and depth.
+            - Version C: architecture/value emphasis - add quantifiable outcomes if plausible.
+            - Each version must be a complete, ready-to-paste English paragraph. No meta-labels.
+
+            Original description:
+            {{original}}
+            """;
+    private static final String EN_RESPONSIBILITY_PROMPT = """
+            Optimize the following responsibility bullet point for a technical resume.
+
+            Formula: tech stack used, problem solved, business outcome, quantifiable data.
+            Preserve any existing metrics. Do not fabricate numbers.
+
+            Output 3 versions as JSON: {"candidates":["conservative","standard","impactful"]}
+            - Conservative: tighten language only.
+            - Standard: clarify implicit technical details.
+            - Impactful: emphasize scale, architecture, and measurable value.
+
+            Context:
+            - Company: {{company}}
+            - Position: {{position}}
+            - Project: {{projectName}}
+            - Tech stack: {{techStack}}
+            - Project description: {{projectDescription}}
+
+            Original responsibility:
+            {{original}}
+
+            Each version must be a complete, ready-to-paste English bullet. No meta-labels.
+            """;
+
     private static boolean isEnglishLanguage(String language) {
         return "en-US".equals(language);
     }
@@ -391,7 +441,7 @@ public class AiServiceImpl implements AiService {
     @Override
     public Map<String, Object> optimizeModuleField(String moduleType, Map<String, Object> content, AiFieldOptimizeRequestDTO request, String language) {
         validateConfiguration();
-        var plan = prepareFieldOptimizePlan(moduleType, content, request);
+        var plan = prepareFieldOptimizePlan(moduleType, content, request, language);
 
         log.info("[AI Optimize][Service] preparing field optimize: moduleType={}, fieldType={}, index={}, original={}",
                 plan.moduleType(),
@@ -402,7 +452,7 @@ public class AiServiceImpl implements AiService {
         try {
             var candidateOutput = plan.candidateOutput();
             var targetModel = resolveModel();
-            var systemPrompt = resolveFieldSystemPrompt(request);
+            var systemPrompt = resolveFieldSystemPrompt(request, language);
             var response = invokeChatCompletion(
                     targetModel,
                     systemPrompt,
@@ -501,17 +551,17 @@ public class AiServiceImpl implements AiService {
             String language
     ) {
         validateConfiguration();
-        var plan = prepareFieldOptimizePlan(moduleType, content, request);
+        var plan = prepareFieldOptimizePlan(moduleType, content, request, language);
         emitStreamEvent(eventConsumer, "meta", Map.of(
                 "moduleType", plan.moduleType(),
                 "fieldType", plan.fieldType(),
                 "original", plan.originalText()
         ));
-        emitStreamEvent(eventConsumer, "status", Map.of("message", "AI 已连接，正在生成结果。"));
+        emitStreamEvent(eventConsumer, "status", Map.of("message", isEnglishLanguage(language) ? "AI connected, generating results." : "AI 已连接，正在生成结果。"));
 
         try {
             var targetModel = resolveModel();
-            var systemPrompt = resolveFieldSystemPrompt(request);
+            var systemPrompt = resolveFieldSystemPrompt(request, language);
             var streamResult = streamChatCompletion(
                     targetModel,
                     systemPrompt,
@@ -526,10 +576,10 @@ public class AiServiceImpl implements AiService {
             if (plan.candidateOutput()) {
                 var candidates = normalizeResumeCandidates(extractCandidatesFromStreamResult(streamResult));
                 if (candidates.isEmpty() && "length".equals(streamResult.finishReason())) {
-                    emitStreamEvent(eventConsumer, "status", Map.of("message", "首次输出被截断，正在补全最终候选，这一步可能需要几秒。"));
+                    emitStreamEvent(eventConsumer, "status", Map.of("message", isEnglishLanguage(language) ? "Output truncated, completing final candidates..." : "首次输出被截断，正在补全最终候选，这一步可能需要几秒。"));
                     candidates = normalizeResumeCandidates(finalizeCandidateOutput(targetModel, systemPrompt, plan.prompt(), streamResult.content()));
                     if (candidates.isEmpty()) {
-                        emitStreamEvent(eventConsumer, "status", Map.of("message", "首次补全未拿到可用结果，正在重试一次。"));
+                        emitStreamEvent(eventConsumer, "status", Map.of("message", isEnglishLanguage(language) ? "No usable result, retrying..." : "首次补全未拿到可用结果，正在重试一次。"));
                         candidates = normalizeResumeCandidates(finalizeCandidateOutput(targetModel, systemPrompt, plan.prompt(), streamResult.content()));
                     }
                 }
@@ -567,135 +617,126 @@ public class AiServiceImpl implements AiService {
         }
     }
 
-    private FieldOptimizePlan prepareFieldOptimizePlan(String moduleType, Map<String, Object> content, AiFieldOptimizeRequestDTO request) {
+    private FieldOptimizePlan prepareFieldOptimizePlan(String moduleType, Map<String, Object> content, AiFieldOptimizeRequestDTO request, String language) {
         if (request == null || request.getFieldType() == null || request.getFieldType().isBlank()) {
             throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "缺少字段级优化参数");
         }
 
         return switch (moduleType) {
-            case "internship", "work_experience" -> buildExperienceFieldOptimizePlan(moduleType, content, request);
-            case "project" -> buildProjectFieldOptimizePlan(content, request);
+            case "internship", "work_experience" -> buildExperienceFieldOptimizePlan(moduleType, content, request, language);
+            case "project" -> buildProjectFieldOptimizePlan(content, request, language);
             default -> throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "当前模块暂不支持字段级 AI 优化");
         };
     }
 
-    private FieldOptimizePlan buildExperienceFieldOptimizePlan(String moduleType, Map<String, Object> content, AiFieldOptimizeRequestDTO request) {
+    private FieldOptimizePlan buildExperienceFieldOptimizePlan(String moduleType, Map<String, Object> content, AiFieldOptimizeRequestDTO request, String language) {
         var company = getStringValue(content.get("company"));
         var position = getStringValue(content.get("position"));
         var projectName = getStringValue(content.get("projectName"));
         var techStack = getStringValue(content.get("techStack"));
         var projectDescription = getStringValue(content.get("projectDescription"));
         var responsibilities = getStringListValue(content.get("responsibilities"));
+        var english = isEnglishLanguage(language);
 
         return switch (request.getFieldType()) {
             case "project_description" -> {
                 if (projectDescription.isBlank()) {
-                    throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "项目简介为空，暂时无法优化");
+                    throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), english ? "Project description is empty" : "项目简介为空，暂时无法优化");
                 }
+                var promptTemplate = english
+                        ? EN_DESCRIPTION_PROMPT
+                        : loadFieldOptimizePromptConfig().getDescriptionPrompt();
                 yield new FieldOptimizePlan(
                         moduleType,
                         "project_description",
                         projectDescription,
-                        resolveFieldPrompt(
-                                request,
-                                renderPromptTemplate(
-                                        loadFieldOptimizePromptConfig().getDescriptionPrompt(),
-                                        Map.of("original", projectDescription)
-                                )
-                        ),
+                        resolveFieldPrompt(request, renderPromptTemplate(promptTemplate, Map.of("original", projectDescription))),
                         true
                 );
             }
             case "responsibility" -> {
                 var index = request.getIndex();
                 if (index == null || index < 0 || index >= responsibilities.size()) {
-                    throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "核心职责索引无效");
+                    throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), english ? "Invalid responsibility index" : "核心职责索引无效");
                 }
                 var originalText = responsibilities.get(index);
                 if (originalText == null || originalText.isBlank()) {
-                    throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "当前这条核心职责为空，暂时无法优化");
+                    throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), english ? "Responsibility is empty" : "当前这条核心职责为空，暂时无法优化");
                 }
+                var promptTemplate = english
+                        ? EN_RESPONSIBILITY_PROMPT
+                        : loadFieldOptimizePromptConfig().getResponsibilityPrompt();
                 yield new FieldOptimizePlan(
                         moduleType,
                         "responsibility",
                         originalText,
-                        resolveFieldPrompt(
-                                request,
-                                renderPromptTemplate(
-                                        loadFieldOptimizePromptConfig().getResponsibilityPrompt(),
-                                        Map.of(
-                                                "company", company,
-                                                "position", position,
-                                                "projectName", projectName,
-                                                "techStack", techStack,
-                                                "projectDescription", projectDescription,
-                                                "original", originalText
-                                        )
-                                )
-                        ),
+                        resolveFieldPrompt(request, renderPromptTemplate(promptTemplate, Map.of(
+                                "company", company,
+                                "position", position,
+                                "projectName", projectName,
+                                "techStack", techStack,
+                                "projectDescription", projectDescription,
+                                "original", originalText
+                        ))),
                         true
                 );
             }
-            default -> throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "不支持的字段级优化类型");
+            default -> throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), english ? "Unsupported field optimize type" : "不支持的字段级优化类型");
         };
     }
 
-    private FieldOptimizePlan buildProjectFieldOptimizePlan(Map<String, Object> content, AiFieldOptimizeRequestDTO request) {
+    private FieldOptimizePlan buildProjectFieldOptimizePlan(Map<String, Object> content, AiFieldOptimizeRequestDTO request, String language) {
         var projectName = getStringValue(content.get("projectName"));
         var role = getStringValue(content.get("role"));
         var techStack = getStringValue(content.get("techStack"));
         var description = getStringValue(content.get("description"));
         var achievements = getStringListValue(content.get("achievements"));
+        var english = isEnglishLanguage(language);
 
         return switch (request.getFieldType()) {
             case "project_description" -> {
                 if (description.isBlank()) {
-                    throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "项目描述为空，暂时无法优化");
+                    throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), english ? "Project description is empty" : "项目描述为空，暂时无法优化");
                 }
+                var promptTemplate = english
+                        ? EN_DESCRIPTION_PROMPT
+                        : loadFieldOptimizePromptConfig().getDescriptionPrompt();
                 yield new FieldOptimizePlan(
                         "project",
                         "project_description",
                         description,
-                        resolveFieldPrompt(
-                                request,
-                                renderPromptTemplate(
-                                        loadFieldOptimizePromptConfig().getDescriptionPrompt(),
-                                        Map.of("original", description)
-                                )
-                        ),
+                        resolveFieldPrompt(request, renderPromptTemplate(promptTemplate, Map.of("original", description))),
                         true
                 );
             }
             case "responsibility" -> {
                 var index = request.getIndex();
                 if (index == null || index < 0 || index >= achievements.size()) {
-                    throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "核心职责索引无效");
+                    throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), english ? "Invalid responsibility index" : "核心职责索引无效");
                 }
                 var originalText = achievements.get(index);
                 if (originalText == null || originalText.isBlank()) {
-                    throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "当前这条核心职责为空，暂时无法优化");
+                    throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), english ? "Responsibility is empty" : "当前这条核心职责为空，暂时无法优化");
                 }
+                var promptTemplate = english
+                        ? EN_RESPONSIBILITY_PROMPT
+                        : loadFieldOptimizePromptConfig().getResponsibilityPrompt();
                 yield new FieldOptimizePlan(
                         "project",
                         "responsibility",
                         originalText,
-                        resolveFieldPrompt(
-                                request,
-                                renderPromptTemplate(
-                                        loadFieldOptimizePromptConfig().getResponsibilityPrompt(),
-                                        Map.of(
-                                                "projectName", projectName,
-                                                "role", role,
-                                                "techStack", techStack,
-                                                "description", description,
-                                                "original", originalText
-                                        )
-                                )
-                        ),
+                        resolveFieldPrompt(request, renderPromptTemplate(promptTemplate, Map.of(
+                                "company", "",
+                                "position", role,
+                                "projectName", projectName,
+                                "techStack", techStack,
+                                "projectDescription", description,
+                                "original", originalText
+                        ))),
                         true
                 );
             }
-            default -> throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "不支持的字段级优化类型");
+            default -> throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), english ? "Unsupported field optimize type" : "不支持的字段级优化类型");
         };
     }
 
@@ -706,9 +747,12 @@ public class AiServiceImpl implements AiService {
         return defaultPrompt;
     }
 
-    private String resolveFieldSystemPrompt(AiFieldOptimizeRequestDTO request) {
+    private String resolveFieldSystemPrompt(AiFieldOptimizeRequestDTO request, String language) {
         if (request != null && request.getSystemPrompt() != null && !request.getSystemPrompt().isBlank()) {
             return request.getSystemPrompt().trim();
+        }
+        if (isEnglishLanguage(language)) {
+            return EN_FIELD_SYSTEM_PROMPT;
         }
         return loadFieldOptimizePromptConfig().getSystemPrompt();
     }

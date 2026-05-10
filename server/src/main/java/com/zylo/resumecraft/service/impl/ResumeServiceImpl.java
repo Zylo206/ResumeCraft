@@ -4,13 +4,18 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.zylo.resumecraft.common.BusinessException;
 import com.zylo.resumecraft.common.ResultCode;
 import com.zylo.resumecraft.dto.ResumeCreateDTO;
+import com.zylo.resumecraft.dto.ResumeTranslateCopyDTO;
 import com.zylo.resumecraft.dto.ResumeUpdateDTO;
 import com.zylo.resumecraft.entity.Resume;
+import com.zylo.resumecraft.entity.ResumeModule;
 import com.zylo.resumecraft.mapper.ResumeMapper;
+import com.zylo.resumecraft.mapper.ResumeModuleMapper;
+import com.zylo.resumecraft.service.AiService;
 import com.zylo.resumecraft.service.ResumeService;
 import com.zylo.resumecraft.vo.ResumeListVO;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -18,12 +23,16 @@ import java.util.List;
 public class ResumeServiceImpl implements ResumeService {
 
     private final ResumeMapper resumeMapper;
+    private final ResumeModuleMapper moduleMapper;
+    private final AiService aiService;
 
     @Value("${resume.max-count-per-user:20}")
     private int maxResumeCountPerUser;
 
-    public ResumeServiceImpl(ResumeMapper resumeMapper) {
+    public ResumeServiceImpl(ResumeMapper resumeMapper, ResumeModuleMapper moduleMapper, AiService aiService) {
         this.resumeMapper = resumeMapper;
+        this.moduleMapper = moduleMapper;
+        this.aiService = aiService;
     }
 
     @Override
@@ -85,6 +94,59 @@ public class ResumeServiceImpl implements ResumeService {
     @Override
     public Resume getByIdAndUserId(Long resumeId, Long userId) {
         return getAndVerifyOwnership(resumeId, userId);
+    }
+
+    @Override
+    @Transactional
+    public ResumeListVO translateCopy(Long userId, Long resumeId, ResumeTranslateCopyDTO dto) {
+        var sourceResume = getAndVerifyOwnership(resumeId, userId);
+        var targetLanguage = normalizeLanguage(dto.getTargetLanguage());
+
+        // Check resume count limit
+        var count = resumeMapper.selectCount(
+            new LambdaQueryWrapper<Resume>()
+                .eq(Resume::getUserId, userId)
+                .eq(Resume::getStatus, 1)
+        );
+        if (count >= maxResumeCountPerUser) {
+            throw new BusinessException(ResultCode.RESUME_LIMIT_REACHED);
+        }
+
+        // Create new resume
+        var newResume = new Resume();
+        newResume.setUserId(userId);
+        var titleSuffix = "en-US".equals(targetLanguage) ? " - English" : " - 中文";
+        newResume.setTitle(sourceResume.getTitle() + titleSuffix);
+        newResume.setTemplateId(sourceResume.getTemplateId());
+        newResume.setLanguage(targetLanguage);
+        newResume.setStatus(1);
+        resumeMapper.insert(newResume);
+
+        // Load source modules
+        var sourceModules = moduleMapper.selectList(
+            new LambdaQueryWrapper<ResumeModule>()
+                .eq(ResumeModule::getResumeId, resumeId)
+                .orderByAsc(ResumeModule::getSortOrder)
+                .orderByAsc(ResumeModule::getId)
+        );
+
+        // Translate and copy each module
+        for (var sourceModule : sourceModules) {
+            var translatedContent = aiService.optimizeModule(
+                sourceModule.getModuleType(),
+                sourceModule.getContent(),
+                targetLanguage
+            );
+
+            var newModule = new ResumeModule();
+            newModule.setResumeId(newResume.getId());
+            newModule.setModuleType(sourceModule.getModuleType());
+            newModule.setContent(translatedContent);
+            newModule.setSortOrder(sourceModule.getSortOrder());
+            moduleMapper.insert(newModule);
+        }
+
+        return toListVO(newResume);
     }
 
     private String normalizeLanguage(String language) {

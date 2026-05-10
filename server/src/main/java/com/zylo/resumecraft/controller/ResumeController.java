@@ -6,6 +6,7 @@ import com.zylo.resumecraft.dto.ModuleReorderDTO;
 import com.zylo.resumecraft.dto.ModuleUpdateDTO;
 import com.zylo.resumecraft.dto.ResumeCreateDTO;
 import com.zylo.resumecraft.dto.ResumeExportRequestDTO;
+import com.zylo.resumecraft.dto.ResumeTranslateCopyDTO;
 import com.zylo.resumecraft.dto.ResumeUpdateDTO;
 import com.zylo.resumecraft.entity.ResumeModule;
 import com.zylo.resumecraft.service.ResumeExportService;
@@ -104,6 +105,12 @@ public class ResumeController {
     public Result<Void> deleteModule(@PathVariable Long id, @PathVariable Long mid) {
         moduleService.delete(id, getCurrentUserId(), mid);
         return Result.success();
+    }
+
+    @Operation(summary = "翻译复制简历")
+    @PostMapping("/{id}/translate-copy")
+    public Result<ResumeListVO> translateCopy(@PathVariable Long id, @RequestBody ResumeTranslateCopyDTO dto) {
+        return Result.success(resumeService.translateCopy(getCurrentUserId(), id, dto));
     }
 
     @Operation(summary = "导出简历 PDF")

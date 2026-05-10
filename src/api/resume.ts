@@ -316,6 +316,9 @@ export const resumeApi = {
   deleteModule: (resumeId: number, moduleId: number) =>
     client.delete(`/resumes/${resumeId}/modules/${moduleId}`),
 
+  translateCopy: (resumeId: number, data: { targetLanguage: ResumeLanguage }) =>
+    client.post<ApiEnvelope<ResumeListItem>>(`/resumes/${resumeId}/translate-copy`, data, { timeout: 120000 }),
+
   exportPdf: (
     resumeId: number,
     data?: {

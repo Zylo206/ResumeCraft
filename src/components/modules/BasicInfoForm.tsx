@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import type { ResumeLanguage } from '../../api/resume'
 import type { BasicInfoContent } from '../../types'
 import { useModuleContentState } from '../../hooks/useModuleContentState'
 import { normalizeBasicInfoContent } from '../../utils/moduleContent'
@@ -8,15 +9,18 @@ import {
   normalizePhotoSource,
   readPhotoFileAsDataUrl,
 } from '../../utils/resumePhoto'
+import { getUILabel, normalizeResumeLanguage } from '../../utils/resumeDisplay'
 import { ModuleSaveBar } from './ModuleSaveBar'
 
 interface Props {
   resumeId: number
   moduleId: number
   initialContent: Record<string, unknown>
+  language?: ResumeLanguage
 }
 
-export function BasicInfoForm({ resumeId, moduleId, initialContent }: Props) {
+export function BasicInfoForm({ resumeId, moduleId, initialContent, language }: Props) {
+  const isEn = normalizeResumeLanguage(language) === 'en-US'
   const [content, setContent, { saveNow, saveState, errorMessage, hasUnsavedChanges }] = useModuleContentState<BasicInfoContent>({
     resumeId,
     moduleId,
@@ -49,7 +53,7 @@ export function BasicInfoForm({ resumeId, moduleId, initialContent }: Props) {
       update('photo', dataUrl)
       setShowOptionalFields(true)
     } catch (error: unknown) {
-      setPhotoError(error instanceof Error ? error.message : '读取图片失败，请稍后重试')
+      setPhotoError(error instanceof Error ? error.message : (isEn ? 'Failed to read image' : '读取图片失败，请稍后重试'))
     }
   }
 
@@ -79,14 +83,14 @@ export function BasicInfoForm({ resumeId, moduleId, initialContent }: Props) {
       />
 
       <div className="grid grid-cols-2 gap-4">
-        <Field label="姓名" value={content.name} onChange={(v) => update('name', v)} />
-        <Field label="邮箱" value={content.email} onChange={(v) => update('email', v)} />
-        <Field label="手机号" value={content.phone} onChange={(v) => update('phone', v)} />
-        <Field label="微信号" value={content.wechat} onChange={(v) => update('wechat', v)} />
-        <Field label="籍贯" value={content.hometown} onChange={(v) => update('hometown', v)} />
-        <Field label="工作年限" value={content.workYears} onChange={(v) => update('workYears', v)} />
+        <Field label={getUILabel('name', language)} value={content.name} onChange={(v) => update('name', v)} />
+        <Field label={getUILabel('email', language)} value={content.email} onChange={(v) => update('email', v)} />
+        <Field label={getUILabel('phone', language)} value={content.phone} onChange={(v) => update('phone', v)} />
+        <Field label={isEn ? 'WeChat' : '微信号'} value={content.wechat} onChange={(v) => update('wechat', v)} />
+        <Field label={isEn ? 'Hometown' : '籍贯'} value={content.hometown} onChange={(v) => update('hometown', v)} />
+        <Field label={isEn ? 'Work Years' : '工作年限'} value={content.workYears} onChange={(v) => update('workYears', v)} />
         <Field label="GitHub" value={content.github} onChange={(v) => update('github', v)} />
-        <Field label="博客" value={content.blog} onChange={(v) => update('blog', v)} />
+        <Field label={isEn ? 'Blog' : '博客'} value={content.blog} onChange={(v) => update('blog', v)} />
       </div>
       {!showOptionalFields ? (
         <button
@@ -94,21 +98,21 @@ export function BasicInfoForm({ resumeId, moduleId, initialContent }: Props) {
           onClick={() => setShowOptionalFields(true)}
           className="text-sm text-primary-600 hover:text-primary-700"
         >
-          + 添加可选信息
+          {isEn ? '+ Add optional info' : '+ 添加可选信息'}
         </button>
       ) : (
         <div className="space-y-4 rounded-xl border border-dashed border-gray-200 bg-gray-50/70 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-700">可选信息</p>
-              <p className="mt-1 text-xs text-gray-500">上传个人证件照，用于简历头部展示。</p>
+              <p className="text-sm font-medium text-gray-700">{isEn ? 'Optional Info' : '可选信息'}</p>
+              <p className="mt-1 text-xs text-gray-500">{isEn ? 'Upload a photo for your resume header.' : '上传个人证件照，用于简历头部展示。'}</p>
             </div>
             <button
               type="button"
               onClick={() => setShowOptionalFields(false)}
               className="text-sm text-gray-400 hover:text-gray-600"
             >
-              {hasOptionalFields ? '收起' : '取消'}
+              {hasOptionalFields ? (isEn ? 'Collapse' : '收起') : (isEn ? 'Cancel' : '取消')}
             </button>
           </div>
 
@@ -116,9 +120,11 @@ export function BasicInfoForm({ resumeId, moduleId, initialContent }: Props) {
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium text-gray-700">照片</p>
+                  <p className="text-sm font-medium text-gray-700">{isEn ? 'Photo' : '照片'}</p>
                   <p className="mt-1 text-xs text-gray-500">
-                    支持本地上传或直接填写图片 URL，建议使用 3:4 证件照比例，大小不超过 {BASIC_INFO_PHOTO_MAX_SIZE_MB}MB。
+                    {isEn
+                      ? `Upload a local file or paste an image URL. Recommended 3:4 ratio, max ${BASIC_INFO_PHOTO_MAX_SIZE_MB}MB.`
+                      : `支持本地上传或直接填写图片 URL，建议使用 3:4 证件照比例，大小不超过 ${BASIC_INFO_PHOTO_MAX_SIZE_MB}MB。`}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -134,7 +140,7 @@ export function BasicInfoForm({ resumeId, moduleId, initialContent }: Props) {
                     onClick={() => fileInputRef.current?.click()}
                     className="rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-700 transition hover:border-primary-300 hover:bg-primary-100"
                   >
-                    选择文件
+                    {isEn ? 'Choose File' : '选择文件'}
                   </button>
                   {content.photo && (
                     <button
@@ -142,32 +148,32 @@ export function BasicInfoForm({ resumeId, moduleId, initialContent }: Props) {
                       onClick={clearPhoto}
                       className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-500 transition hover:border-red-200 hover:text-red-600"
                     >
-                      移除
+                      {isEn ? 'Remove' : '移除'}
                     </button>
                   )}
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">图片 URL</label>
+                <label className="mb-1 block text-sm font-medium text-gray-700">{isEn ? 'Image URL' : '图片 URL'}</label>
                 <input
                   type="text"
                   value={usingUploadedPhoto ? '' : content.photo}
                   onChange={(e) => handlePhotoUrlChange(e.target.value)}
-                  placeholder={usingUploadedPhoto ? '当前使用的是已上传照片，可在这里改成 URL' : 'https://example.com/avatar.jpg'}
+                  placeholder={usingUploadedPhoto ? (isEn ? 'Using uploaded photo, change to URL here' : '当前使用的是已上传照片，可在这里改成 URL') : 'https://example.com/avatar.jpg'}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500"
                 />
                 {usingUploadedPhoto ? (
-                  <p className="mt-1 text-xs text-gray-500">当前使用的是本地上传照片。</p>
+                  <p className="mt-1 text-xs text-gray-500">{isEn ? 'Using locally uploaded photo.' : '当前使用的是本地上传照片。'}</p>
                 ) : null}
               </div>
 
               <div>
-                <span className="mb-1 block text-sm font-medium text-gray-700">照片边框</span>
+                <span className="mb-1 block text-sm font-medium text-gray-700">{isEn ? 'Photo Border' : '照片边框'}</span>
                 <div className="flex flex-wrap gap-2">
                   {[
-                    { label: '无边框', value: false },
-                    { label: '有边框', value: true },
+                    { label: isEn ? 'No Border' : '无边框', value: false },
+                    { label: isEn ? 'Border' : '有边框', value: true },
                   ].map((option) => {
                     const active = content.photoBorder === option.value
                     const disabled = !content.photo
@@ -189,7 +195,7 @@ export function BasicInfoForm({ resumeId, moduleId, initialContent }: Props) {
                     )
                   })}
                 </div>
-                <p className="mt-1 text-xs text-gray-500">只影响照片外框，不影响照片裁切比例。</p>
+                <p className="mt-1 text-xs text-gray-500">{isEn ? 'Only affects the outer frame, not the crop ratio.' : '只影响照片外框，不影响照片裁切比例。'}</p>
               </div>
 
               {photoError ? (
@@ -208,7 +214,7 @@ export function BasicInfoForm({ resumeId, moduleId, initialContent }: Props) {
                 {normalizedPhotoSource ? (
                   <img
                     src={normalizedPhotoSource}
-                    alt="证件照预览"
+                    alt={isEn ? 'Photo preview' : '证件照预览'}
                     className="h-full w-full object-cover"
                   />
                 ) : (
@@ -216,7 +222,7 @@ export function BasicInfoForm({ resumeId, moduleId, initialContent }: Props) {
                     <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M9 7h6m-6 0a2 2 0 00-2 2v6m2-8a2 2 0 012-2m4 2a2 2 0 00-2-2m2 2v6m0 0a2 2 0 01-2 2m2-2H9m0 0a2 2 0 01-2-2m2 2v-2m3-5a2 2 0 100 4 2 2 0 000-4zm-5 9l2.5-2.5a1.5 1.5 0 012.121 0L15 17" />
                     </svg>
-                    <span className="text-xs font-medium">照片预览</span>
+                    <span className="text-xs font-medium">{isEn ? 'Photo Preview' : '照片预览'}</span>
                   </div>
                 )}
               </div>

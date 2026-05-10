@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { useResumeStore } from '../store/resumeStore'
+import { resumeApi, type ResumeLanguage } from '../api/resume'
 import { Header } from '../components/layout/Header'
 import { DEFAULT_MODULE_TYPE_ORDER, ModuleSidebar } from '../components/editor/ModuleSidebar'
 import { PreviewPanel } from '../components/editor/PreviewPanel'
@@ -19,7 +20,7 @@ import { AwardForm } from '../components/modules/AwardForm'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { SINGLETON_MODULES, type ModuleType } from '../types'
 import { normalizeJobIntentionContent } from '../utils/moduleContent'
-import { getModuleDisplayLabelFromModules } from '../utils/resumeDisplay'
+import { getModuleDisplayLabelFromModules, getUILabel, normalizeResumeLanguage } from '../utils/resumeDisplay'
 import {
   DEFAULT_RESUME_PDF_PREVIEW_CONFIG,
   generateResumePdfBlob,
@@ -93,8 +94,12 @@ async function persistModuleOrderForModules(
 
 export default function EditorPage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { modules, loading, fetchModules, addModule, reorderModules, deleteModule } = useResumeStore()
+  const { modules, loading, fetchModules, addModule, reorderModules, deleteModule, resumeList } = useResumeStore()
+  const currentResume = resumeList.find((r) => r.id === Number(id))
+  const resumeLanguage: ResumeLanguage = normalizeResumeLanguage(currentResume?.language)
+  const isEn = resumeLanguage === 'en-US'
   const [activeModuleType, setActiveModuleType] = useState<ModuleType | null>(null)
   const [aiModuleId, setAiModuleId] = useState<number | null>(null)
   const [editorView, setEditorView] = useState<EditorView>('module')
@@ -107,6 +112,8 @@ export default function EditorPage() {
   const [previewCollapsed, setPreviewCollapsed] = useState(false)
   const [moduleTypeOrder, setModuleTypeOrder] = useState<ModuleType[]>(DEFAULT_MODULE_TYPE_ORDER)
   const [pdfPreviewConfig, setPdfPreviewConfig] = useState<ResumePdfPreviewConfig>(DEFAULT_RESUME_PDF_PREVIEW_CONFIG)
+  const [translating, setTranslating] = useState(false)
+  const [translateError, setTranslateError] = useState('')
 
   const resumeId = Number(id)
   const requestedModuleType = searchParams.get('moduleType')
@@ -300,7 +307,7 @@ export default function EditorPage() {
     void addModule(resumeId, 'basic_info', getDefaultContent('basic_info'), 0)
       .catch((error) => {
         if (!cancelled) {
-          console.error('初始化基本信息模块失败:', error)
+          console.error('Failed to initialize basic info module:', error)
         }
       })
       .finally(() => {
@@ -417,9 +424,25 @@ export default function EditorPage() {
     ? '42px'
     : 'calc(clamp(500px, 42vw, 540px) - 16px)'
 
+  const handleTranslateCopy = useCallback(async () => {
+    const targetLanguage = resumeLanguage === 'en-US' ? 'zh-CN' : 'en-US'
+    setTranslating(true)
+    setTranslateError('')
+    try {
+      const { data: res } = await resumeApi.translateCopy(resumeId, { targetLanguage })
+      void useResumeStore.getState().fetchResumeList()
+      navigate(`/editor/${res.data.id}`)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : (isEn ? 'Failed to generate copy' : '生成副本失败')
+      setTranslateError(message)
+    } finally {
+      setTranslating(false)
+    }
+  }, [resumeId, resumeLanguage, isEn, navigate])
+
   const handleExportPdf = useCallback(async (pageMode: ResumePdfPageMode) => {
     if (modules.length === 0) {
-      setExportError('请先完善简历内容后再导出 PDF')
+      setExportError(isEn ? 'Please complete your resume before exporting PDF' : '请先完善简历内容后再导出 PDF')
       return
     }
 
@@ -442,7 +465,7 @@ export default function EditorPage() {
       document.body.removeChild(link)
       URL.revokeObjectURL(objectUrl)
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '导出 PDF 失败，请稍后重试'
+      const message = err instanceof Error ? err.message : (isEn ? 'PDF export failed' : '导出 PDF 失败，请稍后重试')
       setExportError(message)
     } finally {
       setExporting(false)
@@ -463,7 +486,7 @@ export default function EditorPage() {
       : content
     const props = { resumeId, moduleId, initialContent: mergedBasicInfoContent }
     switch (activeModuleType) {
-      case 'basic_info': return <BasicInfoForm {...props} />
+      case 'basic_info': return <BasicInfoForm {...props} language={resumeLanguage} />
       case 'education': return <EducationForm {...props} />
       case 'internship': return <InternshipForm {...props} />
       case 'work_experience': return <WorkExperienceForm {...props} />
@@ -485,8 +508,8 @@ export default function EditorPage() {
         <button
           type="button"
           onClick={() => setPreviewCollapsed((current) => !current)}
-          aria-label={previewCollapsed ? '展开预览面板' : '收起预览面板'}
-          title={previewCollapsed ? '展开预览面板' : '收起预览面板'}
+          aria-label={previewCollapsed ? (isEn ? 'Expand preview' : '展开预览面板') : (isEn ? 'Collapse preview' : '收起预览面板')}
+          title={previewCollapsed ? (isEn ? 'Expand preview' : '展开预览面板') : (isEn ? 'Collapse preview' : '收起预览面板')}
           style={{ right: previewToggleRight }}
           className="fixed top-1/2 z-30 flex h-24 w-8 -translate-y-1/2 flex-col items-center justify-center rounded-full border border-gray-200 bg-white/95 text-gray-500 shadow-[0_18px_38px_-18px_rgba(15,23,42,0.32)] backdrop-blur transition hover:border-primary-200 hover:text-primary-700"
         >
@@ -498,7 +521,7 @@ export default function EditorPage() {
             )}
           </svg>
           <span className="mt-2 text-[10px] font-semibold tracking-[0.28em] [writing-mode:vertical-rl]">
-            预览
+            {isEn ? 'Preview' : '预览'}
           </span>
         </button>
       )}
@@ -512,7 +535,7 @@ export default function EditorPage() {
               <span className="h-1.5 w-1.5 rounded-full bg-primary-400" />
             </div>
             <span className="text-[11px] font-medium tracking-[0.32em] text-gray-500 [writing-mode:vertical-rl]">
-              右侧预览
+              {isEn ? 'Preview' : '右侧预览'}
             </span>
           </div>
         </div>
@@ -529,7 +552,7 @@ export default function EditorPage() {
             const moduleIds = modules
               .filter((module) => module.moduleType === moduleType)
               .map((module) => module.id)
-            openDeleteDialog(moduleIds, moduleType, moduleIds.length > 1 ? '全部内容' : '当前内容')
+            openDeleteDialog(moduleIds, moduleType, moduleIds.length > 1 ? (isEn ? 'All content' : '全部内容') : (isEn ? 'Current content' : '当前内容'))
           }}
           onReorderModules={handleReorderModules}
           onReorderModuleTypes={handleReorderModuleTypes}
@@ -537,6 +560,7 @@ export default function EditorPage() {
           onSelectAnalysis={openAnalysisView}
           templateSelectionActive={editorView === 'template-selection'}
           onSelectTemplateSelection={openTemplateSelectionView}
+          language={resumeLanguage}
         />
 
         <main className="min-w-0 flex-1 px-6 py-6 xl:px-8">
@@ -567,13 +591,37 @@ export default function EditorPage() {
                 </div>
               )}
 
-              <div className="mb-4 flex justify-end">
+              <div className="mb-4 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => void handleTranslateCopy()}
+                  disabled={translating || modules.length === 0}
+                  title={getUILabel('generateEnglishCopyTooltip', resumeLanguage)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-primary-200 bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-700 transition hover:border-primary-300 hover:bg-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {translating ? (
+                    <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  ) : (
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                    </svg>
+                  )}
+                  {translating
+                    ? getUILabel('generating', resumeLanguage)
+                    : getUILabel('generateEnglishCopy', resumeLanguage)}
+                </button>
+                {translateError && (
+                  <span className="text-xs text-red-500">{translateError}</span>
+                )}
                 {activeModules.length > 0 && canAddAnotherInstance && (
                   <button
                     onClick={() => handleAddInstanceOfType(activeModuleType)}
                     className="text-sm text-primary-600 hover:text-primary-700"
                   >
-                    + 添加
+                    + {isEn ? 'Add' : '添加'}
                   </button>
                 )}
               </div>
@@ -585,7 +633,7 @@ export default function EditorPage() {
                       {activeModules.length > 1 && (
                         <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-100">
                           <span className="text-sm font-medium text-gray-500">
-                            第 {index + 1} 条
+                            {isEn ? `#${index + 1}` : `第 ${index + 1} 条`}
                           </span>
                           <div className="flex gap-2">
                             {canOptimizeActiveModule && (
@@ -602,10 +650,10 @@ export default function EditorPage() {
                             <button
                               type="button"
                               onMouseDown={(event) => event.preventDefault()}
-                              onClick={() => openDeleteDialog([mod.id], activeModuleType, `第 ${index + 1} 条`)}
+                              onClick={() => openDeleteDialog([mod.id], activeModuleType, isEn ? `#${index + 1}` : `第 ${index + 1} 条`)}
                               className="text-xs text-gray-400 hover:text-red-500"
                             >
-                              删除
+                              {isEn ? 'Delete' : '删除'}
                             </button>
                           </div>
                         </div>
@@ -627,10 +675,10 @@ export default function EditorPage() {
                             <button
                               type="button"
                               onMouseDown={(event) => event.preventDefault()}
-                              onClick={() => openDeleteDialog([mod.id], activeModuleType, '当前内容')}
+                              onClick={() => openDeleteDialog([mod.id], activeModuleType, isEn ? 'Current content' : '当前内容')}
                               className="text-xs text-gray-400 hover:text-red-500"
                             >
-                              删除
+                              {isEn ? 'Delete' : '删除'}
                             </button>
                           )}
                         </div>
@@ -641,17 +689,17 @@ export default function EditorPage() {
                 </div>
               ) : activeModuleType === 'basic_info' && initializingBasicInfo ? (
                 <div className="text-center py-12 text-gray-400">
-                  正在初始化基本信息...
+                  {isEn ? 'Initializing basic info...' : '正在初始化基本信息...'}
                 </div>
               ) : (
                 <div className="text-center py-12 text-gray-400">
-                  该模块尚未添加
+                  {isEn ? 'This module has not been added yet' : '该模块尚未添加'}
                 </div>
               )}
             </div>
           ) : (
             <div className="text-center py-20 text-gray-400">
-              请在左侧选择模块开始编辑
+              {isEn ? 'Select a module from the left to start editing' : '请在左侧选择模块开始编辑'}
             </div>
           )}
         </main>
@@ -670,6 +718,7 @@ export default function EditorPage() {
                   modules={modules}
                   loading={loading}
                   pdfConfig={pdfPreviewConfig}
+                  language={resumeLanguage}
                 />
               )}
             </div>
@@ -687,12 +736,14 @@ export default function EditorPage() {
 
       <ConfirmDialog
         open={Boolean(deleteDialog)}
-        title="删除模块内容"
+        title={isEn ? 'Delete Module Content' : '删除模块内容'}
         description={deleteDialog
-          ? `确定删除${deleteDialog.moduleLabel}中的${deleteDialog.itemLabel}吗？删除后将无法恢复。`
+          ? isEn
+            ? `Delete ${deleteDialog.itemLabel} from ${deleteDialog.moduleLabel}? This cannot be undone.`
+            : `确定删除${deleteDialog.moduleLabel}中的${deleteDialog.itemLabel}吗？删除后将无法恢复。`
           : ''}
-        confirmText="确认删除"
-        cancelText="先保留"
+        confirmText={isEn ? 'Delete' : '确认删除'}
+        cancelText={isEn ? 'Keep' : '先保留'}
         tone="danger"
         loading={deleteDialog !== null && deletingModuleId !== null}
         onConfirm={handleDeleteModule}

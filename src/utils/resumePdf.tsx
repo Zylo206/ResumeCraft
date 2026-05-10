@@ -939,24 +939,32 @@ function textLengthForPage(values: string[]) {
   return values.reduce((sum, value) => sum + normalizeWhitespace(value).length, 0)
 }
 
-function formatMonth(value: string) {
+const EN_MONTHS_PDF = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function formatMonth(value: string, language?: ResumeLanguage) {
   if (!value) return ''
   const [year, month] = value.split('-')
   if (!year || !month) return value
+  if (normalizeResumeLanguage(language) === 'en-US') {
+    return `${EN_MONTHS_PDF[Number(month) - 1]} ${year}`
+  }
   return `${year}年-${Number(month)}月`
 }
 
-function formatMonthRange(start: string, end: string) {
-  const startText = formatMonth(start)
-  const endText = formatMonth(end)
-  if (startText && endText) return `${startText}至${endText}`
+function formatMonthRange(start: string, end: string, language?: ResumeLanguage) {
+  const startText = formatMonth(start, language)
+  const endText = formatMonth(end, language)
+  if (startText && endText) {
+    return normalizeResumeLanguage(language) === 'en-US' ? `${startText} - ${endText}` : `${startText}至${endText}`
+  }
   return startText || endText
 }
 
-function formatAwardDisplayTime(value: string) {
+function formatAwardDisplayTime(value: string, language?: ResumeLanguage) {
   if (!value) return ''
   const [year] = value.split('-')
-  return year ? `${year}年` : value
+  if (!year) return value
+  return normalizeResumeLanguage(language) === 'en-US' ? year : `${year}年`
 }
 
 function tokenizeMixedText(value: string) {
@@ -1170,6 +1178,8 @@ function ResumePdfDocument({
     .filter((module) => module.moduleType === 'award')
     .map((module) => normalizeAwardContent(module.content))
     .filter((award) => award.awardName || award.awardTime)
+  const isEn = normalizeResumeLanguage(language) === 'en-US'
+  const labelSep = isEn ? ': ' : '：'
   const headerContainerStyle = [
     styles.header,
     ...(isExecutive ? [{ backgroundColor: theme.sectionTitleColor, padding: 14, marginBottom: 16 }] : []),
@@ -1243,16 +1253,16 @@ function ResumePdfDocument({
     if (!basicInfo) return null
 
     const contactItems: Array<{ label: string; value: string; isLink?: boolean }> = []
-    if (basicInfo.email) contactItems.push({ label: '邮箱', value: basicInfo.email })
-    if (basicInfo.phone) contactItems.push({ label: '手机号', value: basicInfo.phone })
-    if (basicInfo.wechat) contactItems.push({ label: '微信', value: basicInfo.wechat })
+    if (basicInfo.email) contactItems.push({ label: isEn ? 'Email' : '邮箱', value: basicInfo.email })
+    if (basicInfo.phone) contactItems.push({ label: isEn ? 'Phone' : '手机号', value: basicInfo.phone })
+    if (basicInfo.wechat) contactItems.push({ label: isEn ? 'WeChat' : '微信', value: basicInfo.wechat })
     if (basicInfo.github) contactItems.push({ label: 'GitHub', value: basicInfo.github, isLink: true })
-    if (basicInfo.blog) contactItems.push({ label: '博客', value: basicInfo.blog, isLink: true })
-    if (basicInfo.hometown) contactItems.push({ label: '籍贯', value: basicInfo.hometown })
-    if (basicInfo.workYears) contactItems.push({ label: '工作年限', value: basicInfo.workYears })
-    if (basicInfo.targetCity) contactItems.push({ label: '意向城市', value: basicInfo.targetCity })
-    if (basicInfo.salaryRange) contactItems.push({ label: '期望薪资', value: basicInfo.salaryRange })
-    if (basicInfo.expectedEntryDate) contactItems.push({ label: '到岗时间', value: basicInfo.expectedEntryDate })
+    if (basicInfo.blog) contactItems.push({ label: isEn ? 'Blog' : '博客', value: basicInfo.blog, isLink: true })
+    if (basicInfo.hometown) contactItems.push({ label: isEn ? 'Hometown' : '籍贯', value: basicInfo.hometown })
+    if (basicInfo.workYears) contactItems.push({ label: isEn ? 'Work Years' : '工作年限', value: basicInfo.workYears })
+    if (basicInfo.targetCity) contactItems.push({ label: isEn ? 'Target City' : '意向城市', value: basicInfo.targetCity })
+    if (basicInfo.salaryRange) contactItems.push({ label: isEn ? 'Expected Salary' : '期望薪资', value: basicInfo.salaryRange })
+    if (basicInfo.expectedEntryDate) contactItems.push({ label: isEn ? 'Available Date' : '到岗时间', value: basicInfo.expectedEntryDate })
     if (basicInfo.leetcode) contactItems.push({ label: 'LeetCode', value: basicInfo.leetcode })
 
     return (
@@ -1299,7 +1309,7 @@ function ResumePdfDocument({
           const schoolTags = [
             content.is985 ? '985' : '',
             content.is211 ? '211' : '',
-            content.isDoubleFirst ? '双一流' : '',
+            content.isDoubleFirst ? (isEn ? 'Double First-Class' : '双一流') : '',
           ].filter(Boolean)
           const departmentMajor = [
             content.department ? `${content.department}` : '',
@@ -1307,11 +1317,11 @@ function ResumePdfDocument({
           ].join('')
           const firstRowItems = [
             content.degree || '',
-            formatMonthRange(content.startDate, content.endDate),
+            formatMonthRange(content.startDate, content.endDate, language),
           ].filter(Boolean)
           const secondRowItems = [
-            content.department ? `院系：${content.department}` : '',
-            content.major ? `专业：${content.major}` : '',
+            content.department ? `${isEn ? 'Dept' : '院系'}${labelSep}${content.department}` : '',
+            content.major ? `${isEn ? 'Major' : '专业'}${labelSep}${content.major}` : '',
           ].filter(Boolean)
 
           return (
@@ -1328,7 +1338,7 @@ function ResumePdfDocument({
                 <View style={styles.rowBetween}>
                   <View style={styles.inlineMeta}>
                     <Text style={styles.inlineMetaItem}>
-                      <Text style={styles.strong}>{content.school || '未填写'}</Text>
+                      <Text style={styles.strong}>{content.school || (isEn ? 'Not filled' : '未填写')}</Text>
                       {departmentMajor ? <Text style={styles.muted}>{` ${departmentMajor}`}</Text> : null}
                     </Text>
                     {!isMinimal && schoolTags.map((tag) => (
@@ -1338,7 +1348,7 @@ function ResumePdfDocument({
                   {content.startDate || content.endDate ? (
                     <View style={styles.inlineMeta}>
                       <Text style={[styles.inlineMetaItem, styles.muted]}>
-                        {formatMonthRange(content.startDate, content.endDate)}
+                        {formatMonthRange(content.startDate, content.endDate, language)}
                       </Text>
                     </View>
                   ) : null}
@@ -1347,7 +1357,7 @@ function ResumePdfDocument({
                 <>
                   <View style={styles.rowBetween}>
                     <View style={styles.inlineMeta}>
-                      <Text style={[styles.inlineMetaItem, styles.strong]}>{content.school || '未填写'}</Text>
+                      <Text style={[styles.inlineMetaItem, styles.strong]}>{content.school || (isEn ? 'Not filled' : '未填写')}</Text>
                       {!isMinimal && schoolTags.map((tag) => (
                         <Text key={tag} style={styles.chip}>{tag}</Text>
                       ))}
@@ -1372,9 +1382,9 @@ function ResumePdfDocument({
           <View style={{ marginTop: 4 }}>
             {awardModules.map((award, index) => (
               <Text key={`${award.awardName}-${index}`} style={styles.paragraph}>
-                <Text style={styles.label}>奖项：</Text>
+                <Text style={styles.label}>{isEn ? 'Award' : '奖项'}{labelSep}</Text>
                 {award.awardName}
-                {award.awardTime ? `（${formatAwardDisplayTime(award.awardTime)}）` : ''}
+                {award.awardTime ? `（${formatAwardDisplayTime(award.awardTime, language)}）` : ''}
               </Text>
             ))}
           </View>
@@ -1390,18 +1400,18 @@ function ResumePdfDocument({
     return (
       <View key={projectModule.id} style={styles.item}>
         <View style={styles.rowBetween}>
-          <Text style={styles.strong}>{titleLine || '项目 - 角色'}</Text>
-          <Text style={styles.muted}>{formatMonthRange(content.startDate, content.endDate)}</Text>
+          <Text style={styles.strong}>{titleLine || (isEn ? 'Project - Role' : '项目 - 角色')}</Text>
+          <Text style={styles.muted}>{formatMonthRange(content.startDate, content.endDate, language)}</Text>
         </View>
-        {content.techStack ? <Text style={styles.paragraph}>技术栈：{content.techStack}</Text> : null}
+        {content.techStack ? <Text style={styles.paragraph}>{isEn ? 'Tech Stack' : '技术栈'}{labelSep}{content.techStack}</Text> : null}
         {content.description ? (
           <View style={styles.paragraph}>
-            {renderWrappedLabeledText(styles, '项目简介：', content.description, `project-summary-${projectModule.id}`)}
+            {renderWrappedLabeledText(styles, isEn ? 'Project Summary: ' : '项目简介：', content.description, `project-summary-${projectModule.id}`)}
           </View>
         ) : null}
         {content.achievements.length > 0 ? (
           <View style={styles.paragraph}>
-            <Text><Text style={styles.label}>核心职责：</Text></Text>
+            <Text><Text style={styles.label}>{isEn ? 'Core Responsibilities: ' : '核心职责：'}</Text></Text>
             {content.achievements.map((item, index) => (
               <View key={`${index}-${item}`} style={styles.listItem}>
                 {renderOrderedItem(styles, item, index, `project-${projectModule.id}-${index}`)}
@@ -1420,18 +1430,18 @@ function ResumePdfDocument({
     return (
       <View key={internshipModule.id} style={styles.item}>
         <View style={styles.rowBetween}>
-          <Text style={styles.strong}>{titleLine || '公司 - 职位 - 项目名'}</Text>
-          <Text style={styles.muted}>{formatMonthRange(content.startDate, content.endDate)}</Text>
+          <Text style={styles.strong}>{titleLine || (isEn ? 'Company - Position - Project' : '公司 - 职位 - 项目名')}</Text>
+          <Text style={styles.muted}>{formatMonthRange(content.startDate, content.endDate, language)}</Text>
         </View>
         {content.projectDescription ? (
           <View style={styles.paragraph}>
-            {renderWrappedLabeledText(styles, '项目简介：', content.projectDescription, `internship-summary-${internshipModule.id}`)}
+            {renderWrappedLabeledText(styles, isEn ? 'Project Summary: ' : '项目简介：', content.projectDescription, `internship-summary-${internshipModule.id}`)}
           </View>
         ) : null}
-        {content.techStack ? <Text style={styles.paragraph}><Text style={styles.label}>技术栈：</Text>{content.techStack}</Text> : null}
+        {content.techStack ? <Text style={styles.paragraph}><Text style={styles.label}>{isEn ? 'Tech Stack: ' : '技术栈：'}</Text>{content.techStack}</Text> : null}
         {content.responsibilities.length > 0 ? (
           <View style={styles.paragraph}>
-            <Text><Text style={styles.label}>核心职责：</Text></Text>
+            <Text><Text style={styles.label}>{isEn ? 'Core Responsibilities: ' : '核心职责：'}</Text></Text>
             {content.responsibilities.map((line, index) => (
               <View key={`${index}-${line}`} style={styles.listItem}>
                 {renderOrderedItem(styles, line, index, `internship-duty-${internshipModule.id}-${index}`)}
@@ -1492,18 +1502,18 @@ function ResumePdfDocument({
                   <Text style={sectionTitleStyle}>{workExperienceSectionTitle}</Text>
                   <View style={styles.item}>
                     <View style={styles.rowBetween}>
-                      <Text style={styles.strong}>{titleLine || '公司 - 职位 - 项目名'}</Text>
-                      <Text style={styles.muted}>{formatMonthRange(content.startDate, content.endDate)}</Text>
+                      <Text style={styles.strong}>{titleLine || (isEn ? 'Company - Position - Project' : '公司 - 职位 - 项目名')}</Text>
+                      <Text style={styles.muted}>{formatMonthRange(content.startDate, content.endDate, language)}</Text>
                     </View>
                     {content.projectDescription ? (
                       <View style={styles.paragraph}>
-                        {renderWrappedLabeledText(styles, '项目简介：', content.projectDescription, `summary-${module.id}`)}
+                        {renderWrappedLabeledText(styles, isEn ? 'Project Summary: ' : '项目简介：', content.projectDescription, `summary-${module.id}`)}
                       </View>
                     ) : null}
-                    {content.techStack ? <Text style={styles.paragraph}><Text style={styles.label}>技术栈：</Text>{content.techStack}</Text> : null}
+                    {content.techStack ? <Text style={styles.paragraph}><Text style={styles.label}>{isEn ? 'Tech Stack: ' : '技术栈：'}</Text>{content.techStack}</Text> : null}
                     {content.responsibilities.length > 0 ? (
                       <View style={styles.paragraph}>
-                        <Text><Text style={styles.label}>核心职责：</Text></Text>
+                        <Text><Text style={styles.label}>{isEn ? 'Core Responsibilities: ' : '核心职责：'}</Text></Text>
                         {content.responsibilities.map((line, index) => (
                           <View key={`${index}-${line}`} style={styles.listItem}>
                             {renderOrderedItem(styles, line, index, `duty-${module.id}-${index}`)}
@@ -1573,7 +1583,7 @@ function ResumePdfDocument({
               return (
                 <View key={module.id} style={sectionStyle}>
                   <Text style={sectionTitleStyle}>{getModuleDisplayLabel('paper', null, language)}</Text>
-                  <Text style={styles.strong}>{content.journalName || '论文'}</Text>
+                  <Text style={styles.strong}>{content.journalName || (isEn ? 'Paper' : '论文')}</Text>
                   <Text>{[content.journalType, content.publishTime].filter(Boolean).join(' / ')}</Text>
                   {content.content ? <Text style={styles.paragraph}>{content.content}</Text> : null}
                 </View>
@@ -1587,11 +1597,11 @@ function ResumePdfDocument({
               return (
                 <View key={module.id} style={sectionStyle}>
                   <Text style={sectionTitleStyle}>{getModuleDisplayLabel('research', null, language)}</Text>
-                  <Text style={styles.strong}>{content.projectName || '科研项目'}</Text>
-                  {content.projectCycle ? <Text>{content.projectCycle}</Text> : null}
-                  {content.background ? <Text style={styles.paragraph}>背景：{content.background}</Text> : null}
-                  {content.workContent ? <Text style={styles.paragraph}>工作：{content.workContent}</Text> : null}
-                  {content.achievements ? <Text style={styles.paragraph}>成果：{content.achievements}</Text> : null}
+                  <Text style={styles.strong}>{content.projectName || (isEn ? 'Research Project' : '科研项目')}</Text>
+                  {content.projectCycle ? <Text>{isEn ? 'Duration' : '周期'}: {content.projectCycle}</Text> : null}
+                  {content.background ? <Text style={styles.paragraph}>{isEn ? 'Background' : '背景'}{labelSep}{content.background}</Text> : null}
+                  {content.workContent ? <Text style={styles.paragraph}>{isEn ? 'Work' : '工作'}{labelSep}{content.workContent}</Text> : null}
+                  {content.achievements ? <Text style={styles.paragraph}>{isEn ? 'Achievements' : '成果'}{labelSep}{content.achievements}</Text> : null}
                 </View>
               )
             }
@@ -1604,8 +1614,8 @@ function ResumePdfDocument({
                 <View key={module.id} style={sectionStyle}>
                   <Text style={sectionTitleStyle}>{getModuleDisplayLabel('award', null, language)}</Text>
                   <Text>
-                    {content.awardName || '奖项'}
-                    {content.awardTime ? `（${formatAwardDisplayTime(content.awardTime)}）` : ''}
+                    {content.awardName || (isEn ? 'Award' : '奖项')}
+                    {content.awardTime ? `（${formatAwardDisplayTime(content.awardTime, language)}）` : ''}
                   </Text>
                 </View>
               )

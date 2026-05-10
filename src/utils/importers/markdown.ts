@@ -32,6 +32,29 @@ const MAIN_SECTION_TITLES = [
   '获奖情况',
 ] as const
 
+const EN_SECTION_TITLE_MAP: Record<string, string> = {
+  'Basic Information': '基本信息',
+  'Basic Info': '基本信息',
+  'Contact': '基本信息',
+  'Education': '教育背景',
+  'Internship': '实习经历',
+  'Internship Experience': '实习经历',
+  'Experience': '工作经历',
+  'Work Experience': '工作经历',
+  'Professional Experience': '工作经历',
+  'Projects': '项目经历',
+  'Project Experience': '项目经历',
+  'Skills': '专业技能',
+  'Technical Skills': '专业技能',
+  'Publications': '论文期刊',
+  'Papers': '论文期刊',
+  'Research': '科研经历',
+  'Research Experience': '科研经历',
+  'Awards': '获奖情况',
+  'Honors': '获奖情况',
+  'Honors & Awards': '获奖情况',
+}
+
 const SECTION_TITLE_ALIASES: Record<string, string> = {
   论文发表: '论文期刊',
 }
@@ -39,11 +62,14 @@ const SECTION_TITLE_SET = new Set<string>([
   ...MAIN_SECTION_TITLES,
   ...Object.keys(SECTION_TITLE_ALIASES),
 ])
-const DESCRIPTION_LABELS = ['项目简介', '项目介绍', '项目描述']
-const TECH_STACK_LABELS = ['技术栈']
-const RESPONSIBILITY_LABELS = ['核心职责', '主要成果', '职责']
-const ROLE_KEYWORD_PATTERN = /(工程师|开发|实习生|实习|架构师|测试|运维|设计|产品|顾问|经理|负责人|研究员)/
-const ROLE_MODIFIER_PATTERN = /(Java|Go|Golang|Python|前端|后端|全栈|客户端|服务端|算法|测试|运维|数据|产品|设计|开发|工程|AI|大模型|Android|iOS|Web|Node|C\+\+)/
+const EN_DESCRIPTION_LABELS = ['Description', 'Summary', 'Project Description', 'Project Summary']
+const EN_TECH_STACK_LABELS = ['Tech Stack', 'Technologies', 'Stack', 'Tools']
+const EN_RESPONSIBILITY_LABELS = ['Responsibilities', 'Key Responsibilities', 'Achievements', 'Duties', 'Core Responsibilities']
+const DESCRIPTION_LABELS = ['项目简介', '项目介绍', '项目描述', ...EN_DESCRIPTION_LABELS]
+const TECH_STACK_LABELS = ['技术栈', ...EN_TECH_STACK_LABELS]
+const RESPONSIBILITY_LABELS = ['核心职责', '主要成果', '职责', ...EN_RESPONSIBILITY_LABELS]
+const ROLE_KEYWORD_PATTERN = /(工程师|开发|实习生|实习|架构师|测试|运维|设计|产品|顾问|经理|负责人|研究员|Engineer|Developer|Intern|Architect|Tester|Manager|Lead|Designer|Researcher|Analyst)/
+const ROLE_MODIFIER_PATTERN = /(Java|Go|Golang|Python|前端|后端|全栈|客户端|服务端|算法|测试|运维|数据|产品|设计|开发|工程|AI|大模型|Android|iOS|Web|Node|C\+\+|Frontend|Backend|Full[- ]?Stack|Mobile|Senior|Junior|Staff|Principal)/
 
 function normalizeMarkdown(markdown: string): string {
   return markdown.replace(/\r\n/g, '\n').replace(/\u00a0/g, ' ')
@@ -62,19 +88,39 @@ function getHeadingTitle(line: string): string | null {
   return match ? match[1].trim() : null
 }
 
+function resolveSectionTitle(heading: string): string | null {
+  if (SECTION_TITLE_SET.has(heading)) {
+    return SECTION_TITLE_ALIASES[heading] ?? heading
+  }
+  const enMapped = EN_SECTION_TITLE_MAP[heading]
+  if (enMapped) {
+    return enMapped
+  }
+  // Case-insensitive English match
+  const lower = heading.toLowerCase()
+  for (const [enTitle, zhTitle] of Object.entries(EN_SECTION_TITLE_MAP)) {
+    if (enTitle.toLowerCase() === lower) {
+      return zhTitle
+    }
+  }
+  return null
+}
+
 function splitIntoSections(markdown: string): Map<string, string[]> {
   const sections = new Map<string, string[]>()
   let currentSection: string | null = null
 
   for (const line of normalizeMarkdown(markdown).split('\n')) {
     const heading = getHeadingTitle(line)
-    if (heading && SECTION_TITLE_SET.has(heading)) {
-      const normalizedHeading = SECTION_TITLE_ALIASES[heading] ?? heading
-      currentSection = normalizedHeading
-      if (!sections.has(normalizedHeading)) {
-        sections.set(normalizedHeading, [])
+    if (heading) {
+      const resolved = resolveSectionTitle(heading)
+      if (resolved) {
+        currentSection = resolved
+        if (!sections.has(resolved)) {
+          sections.set(resolved, [])
+        }
+        continue
       }
-      continue
     }
 
     if (currentSection) {
@@ -243,19 +289,53 @@ function parseKeyValueList(lines: string[]): Record<string, string> {
   return values
 }
 
+const EN_MONTH_NAMES: Record<string, string> = {
+  jan: '01', january: '01',
+  feb: '02', february: '02',
+  mar: '03', march: '03',
+  apr: '04', april: '04',
+  may: '05',
+  jun: '06', june: '06',
+  jul: '07', july: '07',
+  aug: '08', august: '08',
+  sep: '09', september: '09',
+  oct: '10', october: '10',
+  nov: '11', november: '11',
+  dec: '12', december: '12',
+}
+
 function normalizeMonthValue(value: string): string {
   if (!value) {
     return ''
   }
 
   const trimmed = cleanInlineText(value)
-  if (/^(至今|现在)$/u.test(trimmed)) {
+  if (/^(至今|现在|present|current|now)$/i.test(trimmed)) {
     return ''
   }
 
+  // Chinese: 2024年3月 or 2024-03 or 2024/03
   const yearMonthMatch = trimmed.match(/(\d{4})[./年-]\s*(\d{1,2})/)
   if (yearMonthMatch) {
     return `${yearMonthMatch[1]}-${yearMonthMatch[2].padStart(2, '0')}`
+  }
+
+  // English: Jan 2024, January 2024, Sep 2023
+  const enMonthYearMatch = trimmed.match(/^([A-Za-z]+)\s+(\d{4})$/)
+  if (enMonthYearMatch) {
+    const monthNum = EN_MONTH_NAMES[enMonthYearMatch[1].toLowerCase()]
+    if (monthNum) {
+      return `${enMonthYearMatch[2]}-${monthNum}`
+    }
+  }
+
+  // English: 2024 Jan, 2024 January
+  const enYearMonthMatch = trimmed.match(/^(\d{4})\s+([A-Za-z]+)$/)
+  if (enYearMonthMatch) {
+    const monthNum = EN_MONTH_NAMES[enYearMonthMatch[2].toLowerCase()]
+    if (monthNum) {
+      return `${enYearMonthMatch[1]}-${monthNum}`
+    }
   }
 
   const yearMatch = trimmed.match(/(\d{4})年?/)
@@ -267,8 +347,8 @@ function normalizeMonthValue(value: string): string {
 }
 
 function extractDateRange(value: string): { startDate: string; endDate: string; matchedText: string } {
-  const dateToken = '(?:\\d{4}[./-]\\d{1,2}|\\d{4}年\\d{1,2}月?|\\d{4}年|\\d{4}|至今|现在)'
-  const match = value.match(new RegExp(`(${dateToken})\\s*(?:-|~|～|至|—|–)\\s*(${dateToken})`))
+  const dateToken = '(?:\\d{4}[./-]\\d{1,2}|\\d{4}年\\d{1,2}月?|\\d{4}年|\\d{4}|[A-Za-z]+\\s+\\d{4}|\\d{4}\\s+[A-Za-z]+|至今|现在|present|current|now)'
+  const match = value.match(new RegExp(`(${dateToken})\\s*(?:-|~|～|至|—|–|to)\\s*(${dateToken})`, 'i'))
   if (!match) {
     return { startDate: '', endDate: '', matchedText: '' }
   }
@@ -302,6 +382,13 @@ function splitProjectTitleAndRole(value: string): { projectName: string; role: s
   }
 }
 
+function pickValue(values: Record<string, string>, ...keys: string[]): string {
+  for (const key of keys) {
+    if (values[key]) return values[key]
+  }
+  return ''
+}
+
 function parseBasicInfoSection(lines: string[]): Record<string, unknown> | null {
   const values = parseKeyValueList(lines)
   if (Object.keys(values).length === 0) {
@@ -309,23 +396,23 @@ function parseBasicInfoSection(lines: string[]): Record<string, unknown> | null 
   }
 
   return {
-    name: values['姓名'] || '',
-    email: values['邮箱'] || '',
-    jobIntention: values['求职意向'] || '',
-    targetCity: values['意向城市'] || '',
-    salaryRange: values['期望薪资'] || '',
-    expectedEntryDate: values['到岗时间'] || values['到岗日期'] || '',
-    phone: values['电话'] || values['手机号'] || '',
-    wechat: values['微信'] || '',
+    name: pickValue(values, '姓名', 'Name', 'name'),
+    email: pickValue(values, '邮箱', 'Email', 'email'),
+    jobIntention: pickValue(values, '求职意向', 'Objective', 'Career Objective', 'Target Position'),
+    targetCity: pickValue(values, '意向城市', 'Target City', 'Preferred City'),
+    salaryRange: pickValue(values, '期望薪资', 'Expected Salary'),
+    expectedEntryDate: pickValue(values, '到岗时间', '到岗日期', 'Available Date', 'Start Date'),
+    phone: pickValue(values, '电话', '手机号', 'Phone', 'phone', 'Tel'),
+    wechat: pickValue(values, '微信', 'WeChat'),
     isPartyMember: /党员/u.test(values['政治面貌'] || ''),
     photo: '',
     photoBorder: false,
-    hometown: values['籍贯'] || values['所在地'] || '',
-    blog: values['博客'] || values['个人博客'] || '',
-    github: values['GitHub'] || values['Github'] || '',
-    leetcode: values['LeetCode'] || values['leetcode'] || '',
-    workYears: values['工作年限'] || '',
-    summary: values['个人总结'] || values['自我评价'] || '',
+    hometown: pickValue(values, '籍贯', '所在地', 'Hometown', 'Location'),
+    blog: pickValue(values, '博客', '个人博客', 'Blog', 'blog'),
+    github: pickValue(values, 'GitHub', 'Github', 'github'),
+    leetcode: pickValue(values, 'LeetCode', 'leetcode'),
+    workYears: pickValue(values, '工作年限', 'Work Years', 'Years of Experience'),
+    summary: pickValue(values, '个人总结', '自我评价', 'Summary', 'About', 'Profile'),
   }
 }
 
@@ -357,27 +444,28 @@ function parseEducationSection(lines: string[]): { modules: ImportedResumeModule
       continue
     }
 
-    const timeRange = extractDateRange(values['时间'] || '')
+    const timeRange = extractDateRange(pickValue(values, '时间', 'Time', 'Date', 'Period'))
     const tags = `${values['标签'] || ''} ${values['院校标签'] || ''}`
 
     modules.push({
       moduleType: 'education',
       content: {
-        school: entry.heading || values['学校'] || '',
+        school: entry.heading || pickValue(values, '学校', 'School', 'University'),
         schoolLogo: '',
-        department: values['院系'] || values['学院'] || '',
-        major: values['专业'] || '',
-        degree: values['学历'] || '',
+        department: pickValue(values, '院系', '学院', 'Department'),
+        major: pickValue(values, '专业', 'Major'),
+        degree: pickValue(values, '学历', 'Degree'),
         startDate: timeRange.startDate,
         endDate: timeRange.endDate,
         is985: /985/.test(tags),
         is211: /211/.test(tags),
-        isDoubleFirst: /双一流/.test(tags),
+        isDoubleFirst: /双一流|Double First/i.test(tags),
       },
     })
 
-    if (values['奖项']) {
-      awards.push(...parseAwardsFromText(values['奖项']))
+    const awardValue = pickValue(values, '奖项', 'Awards', 'Honors')
+    if (awardValue) {
+      awards.push(...parseAwardsFromText(awardValue))
     }
   }
 
@@ -498,13 +586,13 @@ export function parseMarkdownResume(markdown: string, fileName = '导入简历.m
   }
 
   if (modules.length === 0) {
-    throw new Error('没有识别到可导入的简历内容，请检查 Markdown 结构是否完整')
+    throw new Error('No recognizable resume content found. Please check the Markdown structure.')
   }
 
   const basicInfoContent = basicInfo as { name?: string; jobIntention?: string } | null
   const title = [basicInfoContent?.name, basicInfoContent?.jobIntention]
     .filter(Boolean)
-    .join('-') || removeFileExtension(fileName) || '导入简历'
+    .join(' - ') || removeFileExtension(fileName) || 'Imported Resume'
 
   return { title, modules }
 }

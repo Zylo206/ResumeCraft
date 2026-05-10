@@ -1,7 +1,7 @@
 import { useMemo, useState, type DragEvent } from 'react'
-import type { ResumeModule } from '../../api/resume'
+import type { ResumeModule, ResumeLanguage } from '../../api/resume'
 import { MODULE_ICONS, type ModuleType } from '../../types'
-import { findBasicInfoContent, getModuleDisplayLabel } from '../../utils/resumeDisplay'
+import { findBasicInfoContent, getModuleDisplayLabel, getUILabel } from '../../utils/resumeDisplay'
 
 interface ModuleSidebarProps {
   modules: ResumeModule[]
@@ -16,6 +16,7 @@ interface ModuleSidebarProps {
   onSelectAnalysis?: () => void
   templateSelectionActive?: boolean
   onSelectTemplateSelection?: () => void
+  language?: ResumeLanguage
 }
 
 export const DEFAULT_MODULE_TYPE_ORDER: ModuleType[] = [
@@ -55,6 +56,7 @@ export function ModuleSidebar({
   onSelectAnalysis,
   templateSelectionActive = false,
   onSelectTemplateSelection,
+  language,
 }: ModuleSidebarProps) {
   const [draggedType, setDraggedType] = useState<ModuleType | null>(null)
   const [dragOverType, setDragOverType] = useState<ModuleType | null>(null)
@@ -136,8 +138,8 @@ export function ModuleSidebar({
     <aside className="sticky top-[65px] min-h-[calc(100vh-65px)] max-h-[calc(100vh-65px)] w-56 self-start overflow-y-auto border-r border-gray-200 bg-white">
       <div className="p-4">
         <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">模块</h2>
-          {reordering && <span className="text-xs text-primary-600">保存中</span>}
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">{getUILabel('sidebarTitle', language)}</h2>
+          {reordering && <span className="text-xs text-primary-600">{getUILabel('saving', language)}</span>}
         </div>
         <nav className="space-y-1">
           {orderedRows.map((type) => {
@@ -146,7 +148,7 @@ export function ModuleSidebar({
             const isActive = moduleViewActive && activeModuleType === type
             const count = groupedModules.length
             const canRemove = exists && !NON_REMOVABLE_MODULE_TYPES.has(type)
-            const moduleLabel = getModuleDisplayLabel(type, basicInfoContent)
+            const moduleLabel = getModuleDisplayLabel(type, basicInfoContent, language)
             const isDragOver = dragOverType === type && draggedType !== type
 
             return (
@@ -218,8 +220,8 @@ export function ModuleSidebar({
                       onRemoveModuleType(type)
                     }}
                     className="mr-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-300 transition-colors hover:bg-red-50 hover:text-red-500"
-                    title={`删除${moduleLabel}`}
-                    aria-label={`删除${moduleLabel}`}
+                    title={`${getUILabel('delete', language)}${moduleLabel}`}
+                    aria-label={`${getUILabel('delete', language)}${moduleLabel}`}
                   >
                     <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
@@ -230,8 +232,8 @@ export function ModuleSidebar({
                     type="button"
                     onClick={() => onAddModule(type)}
                     className="mr-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-300 transition-colors hover:bg-primary-50 hover:text-primary-600"
-                    title={`添加${moduleLabel}`}
-                    aria-label={`添加${moduleLabel}`}
+                    title={`${getUILabel('addModule', language)}${moduleLabel}`}
+                    aria-label={`${getUILabel('addModule', language)}${moduleLabel}`}
                   >
                     <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -244,7 +246,7 @@ export function ModuleSidebar({
         </nav>
 
         <div className="mt-6 border-t border-gray-100 pt-4">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">分析</h2>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">{language === 'en-US' ? 'Analysis' : '分析'}</h2>
           <button
             type="button"
             onClick={onSelectAnalysis}
@@ -256,13 +258,13 @@ export function ModuleSidebar({
           >
             <span className="flex items-center gap-2.5">
               <span className="text-base">📊</span>
-              <span className="flex-1">简历分析</span>
+              <span className="flex-1">{language === 'en-US' ? 'Resume Analysis' : '简历分析'}</span>
             </span>
           </button>
         </div>
 
         <div className="mt-6 border-t border-gray-100 pt-4">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">导出</h2>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">{language === 'en-US' ? 'Export' : '导出'}</h2>
           <button
             type="button"
             onClick={onSelectTemplateSelection}
@@ -274,7 +276,7 @@ export function ModuleSidebar({
           >
             <span className="flex items-center gap-2.5">
               <span className="text-base">🖨️</span>
-              <span className="flex-1">预览与导出</span>
+              <span className="flex-1">{language === 'en-US' ? 'Preview & Export' : '预览与导出'}</span>
             </span>
           </button>
         </div>
